@@ -270,6 +270,7 @@ class VhsRenderThread(private val callback: Callback) : HandlerThread(NAME),
             appendLine("measured fps     : ${"%.1f".format(measuredFps)}")
             appendLine("recording        : $recording")
             appendLine("applied rotation : ${transform.rotationDegrees}°")
+            appendLine("aspect           : ${pipeline?.lastMeasure}")
             appendLine("applied mirror   : ${transform.mirror}")
             appendLine("source buffer    : ${transform.sourceWidth}x${transform.sourceHeight}")
             appendLine("letterbox fit    : ${transform.fit}")

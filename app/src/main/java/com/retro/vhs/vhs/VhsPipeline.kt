@@ -3,6 +3,7 @@ package com.retro.vhs.vhs
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.Matrix
+import kotlin.math.hypot
 import com.retro.vhs.gl.Fbo
 import com.retro.vhs.gl.FullscreenQuad
 import com.retro.vhs.gl.GlProgram
@@ -44,11 +45,17 @@ class VhsPipeline(val width: Int, val height: Int) {
     private val dxVec = FloatArray(4)
     private val dyVec = FloatArray(4)
     private val fit = floatArrayOf(1f, 1f)
+    private val surfaceMatrixScratch = FloatArray(16)
     private val unitX = floatArrayOf(1f, 0f, 0f, 0f)
     private val unitY = floatArrayOf(0f, 1f, 0f, 0f)
 
     private var frames = 0L
     private var glitchStartNs = 0L
+
+    /** What the aspect correction worked out this frame, for the debug report. */
+    @Volatile
+    var lastMeasure: String = "not measured"
+        private set
 
     /** A burst of mistracking, the way a deck behaved for a moment after a tape change. */
     fun glitch() {
@@ -195,38 +202,67 @@ class VhsPipeline(val width: Int, val height: Int) {
      * the sensor's orientation, then apply the SurfaceTexture's own transform.
      */
     private fun buildTexMatrix(surfaceMatrix: FloatArray, t: InputTransform) {
-        val rotated = t.rotationDegrees == 90 || t.rotationDegrees == 270
-        val srcW = if (rotated) t.sourceHeight else t.sourceWidth
-        val srcH = if (rotated) t.sourceWidth else t.sourceHeight
-        val srcAspect = srcW.toFloat() / srcH.toFloat()
-        val dstAspect = width.toFloat() / height.toFloat()
+        System.arraycopy(surfaceMatrix, 0, surfaceMatrixScratch, 0, 16)
+        // Orientation first, with no correction, so the aspect can be measured through
+        // the finished chain. Working it out from the rotation alone is not safe: some
+        // devices hand back a SurfaceTexture matrix that already swaps the axes, and the
+        // swap then gets counted twice and squeezes the picture on one side.
+        orient(t, 1f, 1f)
+
+        unitX[0] = 1f
+        unitX[1] = 0f
+        unitY[0] = 0f
+        unitY[1] = 1f
+        Matrix.multiplyMV(dxVec, 0, texMatrix, 0, unitX, 0)
+        Matrix.multiplyMV(dyVec, 0, texMatrix, 0, unitY, 0)
+
+        // How many source pixels one output pixel spans, per axis. Equal means the
+        // picture is not distorted; the ratio is exactly the correction needed.
+        val sw = t.sourceWidth.toFloat()
+        val sh = t.sourceHeight.toFloat()
+        val perX = hypot(dxVec[0] * sw, dxVec[1] * sh) / width
+        val perY = hypot(dyVec[0] * sw, dyVec[1] * sh) / height
 
         var cropX = 1f
         var cropY = 1f
-        if (t.fit) {
-            if (srcAspect > dstAspect) cropY = srcAspect / dstAspect
-            else cropX = dstAspect / srcAspect
-        } else {
-            if (srcAspect > dstAspect) cropX = dstAspect / srcAspect
-            else cropY = srcAspect / dstAspect
+        if (perX > 1e-6f && perY > 1e-6f) {
+            if (t.fit) {
+                // show all of it: stretch the other axis out past the source
+                if (perX > perY) cropY = perX / perY else cropX = perY / perX
+            } else {
+                // fill the raster: sample less of whichever axis is covering more
+                if (perX > perY) cropX = perY / perX else cropY = perX / perY
+            }
         }
-        fit[0] = kotlin.math.abs(cropX)
-        fit[1] = kotlin.math.abs(cropY)
-        if (t.mirror) cropX = -cropX
+        fit[0] = cropX
+        fit[1] = cropY
+        val measured = "rot ${t.rotationDegrees} src ${t.sourceWidth}x${t.sourceHeight} " +
+            "perX %.3f perY %.3f crop %.4f,%.4f".format(perX, perY, cropX, cropY)
+        if (measured != lastMeasure) {
+            lastMeasure = measured
+            android.util.Log.d("VhsAspect", measured)
+        }
 
-        Matrix.setIdentityM(localMatrix, 0)
-        Matrix.translateM(localMatrix, 0, 0.5f, 0.5f, 0f)
-        Matrix.rotateM(localMatrix, 0, -t.rotationDegrees.toFloat(), 0f, 0f, 1f)
-        Matrix.scaleM(localMatrix, 0, cropX, cropY, 1f)
-        Matrix.translateM(localMatrix, 0, -0.5f, -0.5f, 0f)
-        Matrix.multiplyMM(texMatrix, 0, surfaceMatrix, 0, localMatrix, 0)
+        orient(t, if (t.mirror) -cropX else cropX, cropY)
 
         // One output pixel, expressed as a direction in source texture space, so the
         // pickup stage can smear "downwards" even when the sensor is sideways.
         unitX[0] = 1f / width
+        unitX[1] = 0f
+        unitY[0] = 0f
         unitY[1] = 1f / height
         Matrix.multiplyMV(dxVec, 0, texMatrix, 0, unitX, 0)
         Matrix.multiplyMV(dyVec, 0, texMatrix, 0, unitY, 0)
+    }
+
+    /** quad uv -> source uv: scale about the centre, rotate, then the device's own matrix. */
+    private fun orient(t: InputTransform, scaleX: Float, scaleY: Float) {
+        Matrix.setIdentityM(localMatrix, 0)
+        Matrix.translateM(localMatrix, 0, 0.5f, 0.5f, 0f)
+        Matrix.rotateM(localMatrix, 0, -t.rotationDegrees.toFloat(), 0f, 0f, 1f)
+        Matrix.scaleM(localMatrix, 0, scaleX, scaleY, 1f)
+        Matrix.translateM(localMatrix, 0, -0.5f, -0.5f, 0f)
+        Matrix.multiplyMM(texMatrix, 0, surfaceMatrixScratch, 0, localMatrix, 0)
     }
 
     fun release() {
