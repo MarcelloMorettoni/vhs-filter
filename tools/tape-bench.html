@@ -1110,6 +1110,8 @@ function render(now) {
   Object.keys(crtMap).forEach(u => gl.uniform1f(progCrt.u(u), params[crtMap[u]]));
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
+  serviceGrab();
+
   parity = 1 - parity;
   frames++;
 
@@ -1263,12 +1265,25 @@ async function offer(filename, blob) {
   }
 }
 
-/* still frame */
+/* Still frame.
+   The context runs with preserveDrawingBuffer false, so the drawing buffer is
+   only readable inside the task that drew it - reading it from a click handler
+   hands back an empty (black) image. Flag the request and take the snapshot at
+   the end of the next render instead. */
+let grabPending = false;
 document.getElementById('grab').onclick = () => {
+  grabPending = true;
+  recState.textContent = 'grabbing frame';
+};
+
+function serviceGrab() {
+  if (!grabPending) return;
+  grabPending = false;
   canvas.toBlob(b => {
     if (b) offer(fileStem() + '.png', b);
+    else recNote.textContent = 'The browser could not encode that frame.';
   }, 'image/png');
-};
+}
 
 /* ---- the tape's audio path, mirroring VhsAudioProcessor ---- */
 const AUDIO_PROFILES = {
