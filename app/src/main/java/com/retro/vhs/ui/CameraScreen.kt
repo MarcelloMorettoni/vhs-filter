@@ -68,6 +68,7 @@ data class SettingsUiState(
     val vhsAudio: Boolean,
     val recordAudio: Boolean,
     val letterbox: Boolean,
+    val dropouts: Boolean,
     val quality: OutputQuality,
     val rotationOffset: Int = 0
 )
@@ -92,6 +93,7 @@ fun CameraScreen(
     onStatusShown: () -> Unit,
     diagnostics: String,
     onSaveDebugReport: () -> Unit,
+    onSupport: () -> Unit,
     onRotatePicture: () -> Unit,
     previewFactory: (Context) -> View
 ) {
@@ -252,6 +254,7 @@ fun CameraScreen(
                 onChange = onSettingsChange,
                 diagnostics = diagnostics,
                 onSaveDebugReport = onSaveDebugReport,
+                onSupport = onSupport,
                 onDismiss = { showSettings = false }
             )
         }
@@ -394,6 +397,7 @@ private fun SettingsDialog(
     onChange: (SettingsUiState) -> Unit,
     diagnostics: String,
     onSaveDebugReport: () -> Unit,
+    onSupport: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -425,6 +429,9 @@ private fun SettingsDialog(
             }
             ToggleRow("LETTERBOX IMPORTS", settings.letterbox) {
                 onChange(settings.copy(letterbox = it))
+            }
+            ToggleRow("TAPE DROPOUTS", settings.dropouts) {
+                onChange(settings.copy(dropouts = it))
             }
 
             Text(
@@ -500,6 +507,35 @@ private fun SettingsDialog(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.38f),
                 modifier = Modifier.padding(top = 4.dp)
+            )
+
+            Text(
+                "VHS-88 · MARCELLO MORETTONI",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.45f),
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            Text(
+                "github.com/MarcelloMorettoni/vhs-filter",
+                style = MaterialTheme.typography.bodySmall,
+                color = TapeCyan.copy(alpha = 0.75f)
+            )
+            Text(
+                "LIKE THIS APP?",
+                style = MaterialTheme.typography.labelSmall,
+                color = TapeAmber,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+            Text(
+                "BUY ME A COFFEE  \u2615",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Black,
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(TapeAmber)
+                    .clickable(onClick = onSupport)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             )
 
             TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {

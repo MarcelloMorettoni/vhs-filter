@@ -179,6 +179,9 @@ class VideoFileProcessor(
                         egl.makeCurrent(encoderSurface)
                         pipeline.drawToSurface(outputWidth, outputHeight, timeSec)
                         egl.setPresentationTime(encoderSurface, ptsUs * 1000L)
+                        // ...and again out of band, so the written timestamps come from
+                        // the source rather than from how fast this device is running.
+                        encoderCore.queueSourceTimestamp(ptsUs)
                         egl.swapBuffers(encoderSurface)
                         pipeline.advanceFrame()
                         frames++

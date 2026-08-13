@@ -38,6 +38,11 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(KEY_LETTERBOX, true)
         set(value) = prefs.edit().putBoolean(KEY_LETTERBOX, value).apply()
 
+    /** Dropout streaks are the most divisive artefact, so they are switchable. */
+    var dropouts: Boolean
+        get() = prefs.getBoolean(KEY_DROPOUTS, true)
+        set(value) = prefs.edit().putBoolean(KEY_DROPOUTS, value).apply()
+
     /** Extra degrees applied on top of the automatic camera rotation: 0, 90, 180, 270. */
     var rotationOffset: Int
         get() = prefs.getInt(KEY_ROTATION, 0)
@@ -58,5 +63,6 @@ class AppSettings(context: Context) {
         const val KEY_LETTERBOX = "letterbox"
         const val KEY_QUALITY = "quality"
         const val KEY_ROTATION = "rotation_offset"
+        const val KEY_DROPOUTS = "dropouts"
     }
 }

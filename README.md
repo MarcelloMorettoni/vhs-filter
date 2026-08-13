@@ -9,6 +9,10 @@ noise dropped on top.
 
 **MIT licence** · Android 8.0+ · Kotlin + GLES 2.0
 
+[Download the APK](../../releases) · [Try Tape Bench in your browser](https://marcellomorettoni.github.io/vhs-filter/)
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Q5Q11RUO9C)
+
 ![The viewfinder](docs/viewfinder.png)
 
 </div>
@@ -264,6 +268,14 @@ the take, `MuxerWrapper` buffers and flushes.
 - Front-camera capture is mirrored to match the viewfinder.
 
 ---
+
+## Credits
+
+Built by **Marcello Morettoni** — <https://github.com/MarcelloMorettoni/vhs-filter>
+
+Like the app? Buy me a coffee:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/Q5Q11RUO9C)
 
 ## Licence
 

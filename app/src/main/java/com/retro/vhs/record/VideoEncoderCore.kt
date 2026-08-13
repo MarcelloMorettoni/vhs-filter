@@ -23,6 +23,25 @@ class VideoEncoderCore(
     val inputSurface: Surface
     private var trackIndex = -1
 
+    /**
+     * Timestamps to stamp the encoded frames with, in the order they were drawn.
+     *
+     * Surface input is supposed to carry the time set by eglPresentationTimeANDROID,
+     * but some encoders stamp by when the frame arrived instead. That is harmless while
+     * frames are drawn at real time, and turns the file into slow motion the moment the
+     * pipeline falls behind - which is exactly what happens when a device throttles part
+     * way through a long transcode. Feeding the source timestamps through here makes the
+     * output depend on the material rather than on how fast the phone happened to run.
+     *
+     * Only used by the file transcoder; live capture leaves it empty and keeps whatever
+     * the encoder reports, which is already the camera's own clock.
+     */
+    private val sourceTimestamps = ArrayDeque<Long>()
+
+    fun queueSourceTimestamp(presentationTimeUs: Long) {
+        sourceTimestamps.addLast(presentationTimeUs)
+    }
+
     init {
         val format = MediaFormat.createVideoFormat(MIME_TYPE, width, height).apply {
             setInteger(
@@ -69,6 +88,9 @@ class VideoEncoderCore(
                         bufferInfo.size = 0
                     }
                     if (bufferInfo.size != 0 && trackIndex >= 0) {
+                        if (sourceTimestamps.isNotEmpty()) {
+                            bufferInfo.presentationTimeUs = sourceTimestamps.removeFirst()
+                        }
                         data.position(bufferInfo.offset)
                         data.limit(bufferInfo.offset + bufferInfo.size)
                         muxer.writeSampleData(trackIndex, data, bufferInfo)

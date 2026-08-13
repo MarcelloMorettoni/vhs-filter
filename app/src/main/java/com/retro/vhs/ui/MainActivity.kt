@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
     private var status by mutableStateOf<String?>(null)
     private var processing by mutableStateOf<ProcessingUiState?>(null)
     private var ui by mutableStateOf(
-        SettingsUiState(true, true, true, true, true, com.retro.vhs.data.OutputQuality.TAPE)
+        SettingsUiState(true, true, true, true, true, true, com.retro.vhs.data.OutputQuality.TAPE)
     )
 
     /**
@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
             vhsAudio = settings.vhsAudio,
             recordAudio = settings.recordAudio,
             letterbox = settings.letterbox,
+            dropouts = settings.dropouts,
             quality = settings.quality,
             rotationOffset = settings.rotationOffset
         )
@@ -121,7 +122,7 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
         audioPermitted = granted(Manifest.permission.RECORD_AUDIO)
 
         renderThread = VhsRenderThread(this).apply {
-            preset = presets[presetIndex]
+            preset = if (ui.dropouts) presets[presetIndex] else presets[presetIndex].copy(dropout = 0f)
             osdEnabled = ui.osd
             eraDate = ui.eraDate
             start()
@@ -150,6 +151,7 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
                     onStatusShown = { status = null },
                     diagnostics = diagnostics,
                     onSaveDebugReport = ::saveDebugReport,
+                    onSupport = { openLink(KOFI_URL) },
                     onRotatePicture = ::rotatePicture,
                     previewFactory = { context ->
                         VhsPreviewView(context).also { it.renderThread = renderThread }
@@ -221,10 +223,15 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
     private fun selectPreset(index: Int) {
         if (index == presetIndex || recording) return
         presetIndex = index
-        val preset = presets[index]
-        settings.presetId = preset.id
-        renderThread?.preset = preset
+        settings.presetId = presets[index].id
+        renderThread?.preset = effectivePreset()
         renderThread?.triggerGlitch()
+    }
+
+    /** The selected tape, with the switchable artefacts applied. */
+    private fun effectivePreset(): VhsPreset {
+        val preset = presets[presetIndex]
+        return if (ui.dropouts) preset else preset.copy(dropout = 0f)
     }
 
     private fun applySettings(state: SettingsUiState) {
@@ -235,10 +242,12 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
         settings.vhsAudio = state.vhsAudio
         settings.recordAudio = state.recordAudio
         settings.letterbox = state.letterbox
+        settings.dropouts = state.dropouts
         settings.quality = state.quality
         settings.rotationOffset = state.rotationOffset
         renderThread?.osdEnabled = state.osd
         renderThread?.eraDate = state.eraDate
+        renderThread?.preset = effectivePreset()
         if (rotationChanged) applyTransform()
         if (state.recordAudio && !audioPermitted) requestMissingPermissions()
     }
@@ -294,7 +303,7 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
         val job = VideoFileProcessor(
             context = applicationContext,
             source = uri,
-            preset = preset,
+            preset = if (ui.dropouts) preset else preset.copy(dropout = 0f),
             osdEnabled = ui.osd,
             eraDate = ui.eraDate,
             vhsAudio = ui.vhsAudio,
@@ -475,6 +484,11 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
         status = if (next == 0) "PICTURE ROTATION: AUTO" else "PICTURE ROTATION: +$next°"
     }
 
+    private fun openLink(url: String) {
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            .onFailure { status = "NO BROWSER FOUND" }
+    }
+
     /** CameraX's automatic rotation, plus the user's manual correction if they set one. */
     private fun applyTransform() {
         val transform = lastTransform ?: return
@@ -544,5 +558,6 @@ class MainActivity : ComponentActivity(), VhsRenderThread.Callback {
     private companion object {
         const val TAG = "MainActivity"
         const val FRAME_RATE = 30
+        const val KOFI_URL = "https://ko-fi.com/Q5Q11RUO9C"
     }
 }
