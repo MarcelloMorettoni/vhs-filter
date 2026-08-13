@@ -30,9 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pages is configured in the repository settings with GitHub Actions as the
+      # source; this only reads that config. Asking the workflow to switch it on
+      # needs permissions the default token does not have.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Assemble the site
         run: |
