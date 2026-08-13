@@ -156,6 +156,17 @@ WebM. Nothing is uploaded anywhere — the clip never leaves the machine it is o
 For long clips the phone app is the better tool — it writes H.264 + AAC and decodes as
 fast as the device allows rather than in real time.
 
+### Giving it to someone
+
+Send them **<https://marcellomorettoni.github.io/vhs-filter/>** — the tool runs straight
+from the link, and it is rebuilt from `tools/tape-bench.html` on every push, so nobody
+ends up holding a stale copy.
+
+If you would rather hand over the file itself, `tape-bench.html` is attached to each
+[release](../../releases), or use the download button on
+[`tools/tape-bench.html`](tools/tape-bench.html). It is one document — mail it, drop it
+in a chat, put it on a stick. It works offline and nothing it does leaves the machine.
+
 ---
 
 ## Install

@@ -76,12 +76,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
+          cat > notes.md <<'NOTES'
+          Install `vhs-88.apk` on Android 8.0 or newer.
+
+          `tape-bench.html` is the format editor and video converter: one
+          self-contained file, open it in Chrome or Edge, nothing to install.
+          NOTES
+          sed -i 's/^          //' notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" vhs-88.apk --clobber
+            gh release upload "$TAG" vhs-88.apk tools/tape-bench.html --clobber
           else
-            gh release create "$TAG" vhs-88.apk \
-              --title "VHS-88 $TAG" \
-              --notes "Install \`vhs-88.apk\` on Android 8.0 or newer. See the [README](https://github.com/${GITHUB_REPOSITORY}#readme) for what is in it."
+            gh release create "$TAG" vhs-88.apk tools/tape-bench.html \
+              --title "VHS-88 $TAG" --notes-file notes.md
           fi
 
       - uses: actions/upload-artifact@v4
