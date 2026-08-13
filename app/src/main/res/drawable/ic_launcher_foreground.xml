@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- cassette shell -->
+    <path
+        android:fillColor="#111111"
+        android:pathData="M22,36 L86,36 A3,3 0 0 1 89,39 L89,69 A3,3 0 0 1 86,72 L22,72 A3,3 0 0 1 19,69 L19,39 A3,3 0 0 1 22,36 Z" />
+    <!-- label strip -->
+    <path
+        android:fillColor="#E8E2D0"
+        android:pathData="M24,40 L84,40 L84,50 L24,50 Z" />
+    <!-- window -->
+    <path
+        android:fillColor="#2A2A2A"
+        android:pathData="M30,53 L78,53 L78,68 L30,68 Z" />
+    <!-- reels -->
+    <path
+        android:fillColor="#D8D2C0"
+        android:pathData="M41,60.5 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 Z" />
+    <path
+        android:fillColor="#D8D2C0"
+        android:pathData="M67,60.5 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 Z" />
+    <path
+        android:fillColor="#2A2A2A"
+        android:pathData="M41,60.5 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0 Z" />
+    <path
+        android:fillColor="#2A2A2A"
+        android:pathData="M67,60.5 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0 Z" />
+    <!-- tape between reels -->
+    <path
+        android:fillColor="#3A2A1A"
+        android:pathData="M48,58 L60,58 L60,63 L48,63 Z" />
+</vector>

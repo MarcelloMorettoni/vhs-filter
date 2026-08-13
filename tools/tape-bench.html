@@ -1,0 +1,1400 @@
+<title>Tape Bench</title>
+<style>
+  :root {
+    /* A video console: committed dark, because you cannot judge a picture
+       against a light surround. Palette inherited from the VHS-88 chassis. */
+    --ground: #0b0b0c;
+    --panel: #16171a;
+    --raised: #1f2126;
+    --raised-hi: #292c32;
+    --rule: #2c2f35;
+    --ink: #e9e6df;
+    --muted: #878b93;
+    --dim: #5f636a;
+    --amber: #ffb43a;
+    --red: #e23b3b;
+    --cyan: #3ed8d0;
+    --font-display: "Helvetica Neue", "Arial Narrow", Inter, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --gap: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 { margin: 0; text-wrap: balance; }
+
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--rule);
+    background: linear-gradient(180deg, #131417, var(--ground));
+  }
+  .wordmark {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .wordmark span { color: var(--amber); }
+  .masthead p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  .console {
+    display: grid;
+    grid-template-rows: auto auto;
+    grid-template-columns: 262px minmax(440px, 1fr) 330px;
+    gap: var(--gap);
+    padding: var(--gap);
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .console { grid-template-columns: 1fr; }
+    .console > * { grid-column: 1 !important; grid-row: auto !important; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .panel > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    background: var(--raised);
+    border-bottom: 1px solid var(--rule);
+  }
+  .panel > header h2 {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .panel > .body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+  .count { color: var(--dim); font-size: 11px; }
+
+  /* ---- signal chain ---- */
+  .stage-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-top: 4px;
+  }
+  .stage-label::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+  .stage-label:first-child { margin-top: 0; }
+
+  .layer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 9px;
+    background: var(--raised);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule);
+    border-radius: 3px;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .layer:hover { background: var(--raised-hi); }
+  .layer[aria-selected="true"] { border-color: var(--amber); border-left-color: var(--amber); }
+  .layer .nm { flex: 1; }
+  .layer .rm {
+    color: var(--dim);
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  .layer .rm:hover { color: var(--red); }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--red);
+    flex: none;
+  }
+
+  .add-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    padding: 5px 9px;
+    background: transparent;
+    border: 1px dashed var(--rule);
+    color: var(--muted);
+    border-radius: 3px;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .chip:hover { border-color: var(--cyan); color: var(--cyan); border-style: solid; }
+  .empty { color: var(--dim); font-size: 11px; }
+
+  /* ---- preview ---- */
+  .screen-wrap {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+  }
+  canvas#screen {
+    width: 100%;
+    max-width: 820px;
+    aspect-ratio: 4 / 3;
+    display: block;
+    background: #000;
+    border-radius: 2px;
+  }
+
+  .strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 12px;
+    border-top: 1px solid var(--rule);
+  }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+  .seg button {
+    padding: 5px 10px;
+    background: var(--raised);
+    color: var(--muted);
+    border: 0;
+    border-right: 1px solid var(--rule);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--amber); color: #10100f; }
+  .seg button:hover:not([aria-pressed="true"]) { background: var(--raised-hi); color: var(--ink); }
+
+  label.file {
+    padding: 5px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--raised);
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  label.file:hover { color: var(--cyan); border-color: var(--cyan); }
+  label.file input { display: none; }
+
+  .readout { margin-left: auto; color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+  /* ---- parameters ---- */
+  .param { display: grid; gap: 4px; }
+  .param .top {
+    display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
+  }
+  .param .top span:first-child { color: var(--ink); }
+  .param .val { color: var(--amber); font-variant-numeric: tabular-nums; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 18px; background: transparent; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 3px; background: var(--rule); border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-track { height: 3px; background: var(--rule); border-radius: 2px; }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 13px; height: 13px; margin-top: -5px;
+    background: var(--amber); border-radius: 2px; border: 0;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 13px; height: 13px; background: var(--amber); border-radius: 2px; border: 0;
+  }
+
+  .note { color: var(--muted); font-size: 11px; }
+
+  input[type="text"], textarea, select {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--ground);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+  }
+  textarea { resize: vertical; min-height: 46px; }
+  .field { display: grid; gap: 3px; }
+  .field > span { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  button.action {
+    padding: 8px 12px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--raised);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button.action:hover { background: var(--raised-hi); }
+  button.action.primary { background: var(--cyan); color: #06100f; border-color: var(--cyan); font-weight: 700; }
+  button.action.primary:hover { filter: brightness(1.1); }
+
+  pre.code {
+    margin: 0;
+    padding: 10px;
+    background: var(--ground);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+    max-height: 260px;
+    overflow: auto;
+    white-space: pre;
+  }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<header class="masthead">
+  <div class="wordmark">Tape <span>Bench</span></div>
+  <p>
+    Build a tape format for VHS-88 layer by layer. The preview runs the app's own three
+    shader stages, so what you see here is what the camera records. Export it as Kotlin
+    when the distortion is right.
+  </p>
+</header>
+
+<main class="console">
+
+  <!-- ======================= signal chain ======================= -->
+  <section class="panel" aria-labelledby="chain-h" style="grid-column:1; grid-row:1 / span 2">
+    <header>
+      <h2 id="chain-h">Signal chain</h2>
+      <span class="count" id="layer-count"></span>
+    </header>
+    <div class="body">
+      <p class="note" style="margin:0">
+        Layers sit in the order the signal travelled — lens, then tape, then the
+        television. Order is physics, so it is fixed; add and remove instead.
+      </p>
+      <div id="stack"></div>
+      <div class="stage-label">Add a layer</div>
+      <div class="add-row" id="palette"></div>
+    </div>
+  </section>
+
+  <!-- ======================= preview ======================= -->
+  <section class="panel" aria-labelledby="screen-h" style="grid-column:2">
+    <header>
+      <h2 id="screen-h">Monitor</h2>
+      <span class="count" id="fps"></span>
+    </header>
+    <div class="screen-wrap">
+      <canvas id="screen" width="1280" height="960" aria-label="Live filter preview"></canvas>
+    </div>
+    <div class="strip">
+      <div class="seg" role="group" aria-label="Source">
+        <button data-src="bars" aria-pressed="true">Test pattern</button>
+        <button data-src="file" aria-pressed="false">Loaded clip</button>
+      </div>
+      <label class="file">
+        Load image or video<input type="file" id="file" accept="video/*,image/*">
+      </label>
+      <div class="seg" role="group" aria-label="Preview as">
+        <button data-view="screen" aria-pressed="true">Viewfinder</button>
+        <button data-view="tape" aria-pressed="false">Tape file 640×480</button>
+      </div>
+      <div class="seg" role="group" aria-label="Overlay">
+        <button data-osd="on" aria-pressed="true">Date stamp</button>
+      </div>
+      <span class="readout" id="srcinfo"></span>
+    </div>
+  </section>
+
+  <!-- ======================= record out ======================= -->
+  <section class="panel" aria-labelledby="rec-h" style="grid-column: 2">
+    <header>
+      <h2 id="rec-h">Record out</h2>
+      <span class="count" id="rec-state">idle</span>
+    </header>
+    <div class="body">
+      <div class="strip" style="border-top:0; padding:0">
+        <div class="seg" role="group" aria-label="Length">
+          <button data-len="0" aria-pressed="true">Whole clip</button>
+          <button data-len="10" aria-pressed="false">10 s</button>
+          <button data-len="20" aria-pressed="false">20 s</button>
+          <button data-len="30" aria-pressed="false">30 s</button>
+        </div>
+        <div class="seg" role="group" aria-label="Bitrate">
+          <button data-rate="2000000" aria-pressed="true">2 Mbps</button>
+          <button data-rate="4000000" aria-pressed="false">4 Mbps</button>
+          <button data-rate="8000000" aria-pressed="false">8 Mbps</button>
+        </div>
+        <button class="action primary" id="rec-go">Export video</button>
+        <button class="action" id="grab">Save frame</button>
+      </div>
+      <div id="rec-bar" style="display:none; height:3px; background:var(--rule); border-radius:2px; overflow:hidden">
+        <div id="rec-fill" style="height:100%; width:0; background:var(--red)"></div>
+      </div>
+      <p class="note" id="rec-note" style="margin:0">
+        Records the filtered picture in real time, with the tape's audio path applied to
+        the clip's sound. WebM, capped at 16 MB by the viewer — shorten the length or
+        drop the bitrate if it comes out too big.
+      </p>
+    </div>
+  </section>
+
+  <!-- ======================= right rail ======================= -->
+  <div style="display:grid; gap:var(--gap); grid-column:3; grid-row:1 / span 2">
+
+    <section class="panel" aria-labelledby="param-h">
+      <header>
+        <h2 id="param-h">Parameters</h2>
+        <span class="count" id="param-layer"></span>
+      </header>
+      <div class="body" id="params"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="label-h">
+      <header><h2 id="label-h">Tape label</h2></header>
+      <div class="body">
+        <div class="field"><span>Name</span><input type="text" id="m-name" value="My Tape"></div>
+        <div class="two">
+          <div class="field"><span>Year</span><input type="text" id="m-year" value="1986"></div>
+          <div class="field"><span>Speed</span><input type="text" id="m-speed" value="SP"></div>
+        </div>
+        <div class="field"><span>Format</span><input type="text" id="m-format" value="VHS · Standard Play"></div>
+        <div class="field"><span>Sleeve note</span><textarea id="m-blurb">A tape of my own.</textarea></div>
+        <div class="two">
+          <div class="field"><span>On-screen display</span>
+            <select id="m-osd">
+              <option>CAMCORDER</option><option>DATE_ONLY</option><option>PLAYER</option>
+              <option>TRACKING</option><option>NEWS</option><option>SECURITY</option><option>NONE</option>
+            </select>
+          </div>
+          <div class="field"><span>Audio path</span>
+            <select id="m-audio">
+              <option>LINEAR_SP</option><option>LINEAR_EP</option><option>BETA_MONO</option>
+              <option>HIFI_AFM</option><option>ENG_FIELD</option><option>WORN</option><option>CLEAN</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><span>Start from an existing tape</span>
+          <select id="m-base"></select>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="out-h">
+      <header>
+        <h2 id="out-h">Export</h2>
+        <button class="action primary" id="copy" style="padding:4px 10px">Copy Kotlin</button>
+      </header>
+      <div class="body">
+        <p class="note" style="margin:0">
+          Paste into <code>VhsPreset.ALL</code> in
+          <code>app/src/main/java/com/retro/vhs/vhs/VhsPreset.kt</code>, then rebuild.
+        </p>
+        <pre class="code" id="out"></pre>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const PRESETS = [{"exposure": 1.02,"gamma": 1.0,"contrast": 1.05,"saturation": 1.0,"tintR": 1.0,"tintG": 1.0,"tintB": 1.0,"softness": 0.35,"ccdSmear": 0.0,"tubeLag": 0.0,"lensBloom": 0.22,"lensVignette": 0.18,"lumaBw": 3.0,"chromaBw": 26.0,"chromaDelay": 3.0,"sharpen": 0.55,"dotCrawl": 0.5,"rainbow": 0.25,"noise": 0.045,"noiseDark": 1.2,"chromaNoise": 0.02,"jitter": 0.9,"warp": 1.2,"headSwitch": 0.85,"tracking": 0.0,"dropout": 0.02,"ghost": 0.0,"ghostDist": 0.01,"interlace": 0.9,"persist": 0.1,"sat": 1.0,"hue": 0.0,"black": 0.06,"whiteClip": 0.98,"snow": 0.0,"curve": 0.035,"scanline": 0.45,"mask": 0.18,"crtBloom": 0.35,"crtVignette": 0.3,"glare": 0.1,"overscan": 0.03,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.15,"corner": 0.02,"osd": "OsdStyle.CAMCORDER","osdColor": "0xFFFFFFFF.toInt()","tapeSpeed": "SP","audio": "AudioProfile.LINEAR_SP","id": "vhs_sp","name": "VHS SP","year": "1983","format": "VHS · Standard Play","blurb": "The reference tape. 240 lines of luma, colour smeared sideways, honest dot crawl."},{"exposure": 1.02,"gamma": 1.0,"contrast": 1.05,"saturation": 1.0,"tintR": 1.0,"tintG": 1.0,"tintB": 1.0,"softness": 0.45,"ccdSmear": 0.0,"tubeLag": 0.0,"lensBloom": 0.22,"lensVignette": 0.18,"lumaBw": 6.0,"chromaBw": 46.0,"chromaDelay": 5.0,"sharpen": 0.42,"dotCrawl": 0.55,"rainbow": 0.32,"noise": 0.105,"noiseDark": 1.7,"chromaNoise": 0.045,"jitter": 2.3,"warp": 3.6,"headSwitch": 0.85,"tracking": 0.0,"dropout": 0.09,"ghost": 0.0,"ghostDist": 0.01,"interlace": 0.95,"persist": 0.1,"sat": 0.82,"hue": 0.0,"black": 0.13,"whiteClip": 0.955,"snow": 0.1,"curve": 0.035,"scanline": 0.5,"mask": 0.18,"crtBloom": 0.45,"crtVignette": 0.3,"glare": 0.1,"overscan": 0.03,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.15,"corner": 0.02,"osd": "OsdStyle.PLAYER","osdColor": "0xFFFFFFFF.toInt()","tapeSpeed": "EP","audio": "AudioProfile.LINEAR_EP","id": "vhs_ep","name": "VHS EP","year": "1987","format": "VHS · Extended Play (6 hr)","blurb": "Six hours on one T-120. A third of the tape speed, and it shows in everything."},{"exposure": 1.02,"gamma": 1.0,"contrast": 1.05,"saturation": 1.0,"tintR": 1.04,"tintG": 1.0,"tintB": 0.95,"softness": 0.35,"ccdSmear": 0.0,"tubeLag": 0.0,"lensBloom": 0.22,"lensVignette": 0.18,"lumaBw": 2.5,"chromaBw": 22.0,"chromaDelay": 2.4,"sharpen": 0.5,"dotCrawl": 0.42,"rainbow": 0.22,"noise": 0.04,"noiseDark": 1.2,"chromaNoise": 0.016,"jitter": 0.6,"warp": 0.9,"headSwitch": 0.7,"tracking": 0.0,"dropout": 0.02,"ghost": 0.0,"ghostDist": 0.01,"interlace": 0.9,"persist": 0.1,"sat": 1.06,"hue": 0.035,"black": 0.06,"whiteClip": 0.98,"snow": 0.0,"curve": 0.035,"scanline": 0.42,"mask": 0.18,"crtBloom": 0.35,"crtVignette": 0.3,"glare": 0.1,"overscan": 0.03,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.15,"corner": 0.02,"osd": "OsdStyle.PLAYER","osdColor": "0xFFFFFFFF.toInt()","tapeSpeed": "β II","audio": "AudioProfile.BETA_MONO","id": "betamax","name": "Betamax","year": "1982","format": "Betamax · Beta II","blurb": "Sony's better picture that lost the war. Tighter luma, warmer, steadier transport."},{"exposure": 1.06,"gamma": 1.0,"contrast": 1.12,"saturation": 0.96,"tintR": 1.0,"tintG": 1.0,"tintB": 1.0,"softness": 0.5,"ccdSmear": 0.85,"tubeLag": 0.0,"lensBloom": 0.4,"lensVignette": 0.32,"lumaBw": 3.4,"chromaBw": 30.0,"chromaDelay": 3.0,"sharpen": 0.62,"dotCrawl": 0.5,"rainbow": 0.25,"noise": 0.07,"noiseDark": 1.6,"chromaNoise": 0.028,"jitter": 1.3,"warp": 1.8,"headSwitch": 0.85,"tracking": 0.0,"dropout": 0.02,"ghost": 0.0,"ghostDist": 0.01,"interlace": 1.0,"persist": 0.1,"sat": 1.0,"hue": 0.0,"black": 0.09,"whiteClip": 0.965,"snow": 0.0,"curve": 0.035,"scanline": 0.38,"mask": 0.14,"crtBloom": 0.42,"crtVignette": 0.3,"glare": 0.14,"overscan": 0.03,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.15,"corner": 0.02,"osd": "OsdStyle.CAMCORDER","osdColor": "0xFFFFF2C0.toInt()","tapeSpeed": "SP","audio": "AudioProfile.LINEAR_SP","id": "vhsc_cam","name": "VHS-C Cam","year": "1985","format": "VHS-C · Palmcorder","blurb": "Compact camcorder with a single chip CCD. Smears on every highlight, dates every frame."},{"exposure": 1.02,"gamma": 1.0,"contrast": 1.05,"saturation": 1.0,"tintR": 0.97,"tintG": 1.0,"tintB": 1.05,"softness": 0.3,"ccdSmear": 0.55,"tubeLag": 0.0,"lensBloom": 0.22,"lensVignette": 0.18,"lumaBw": 2.4,"chromaBw": 20.0,"chromaDelay": 2.2,"sharpen": 0.58,"dotCrawl": 0.34,"rainbow": 0.18,"noise": 0.033,"noiseDark": 1.2,"chromaNoise": 0.013,"jitter": 0.55,"warp": 0.8,"headSwitch": 0.55,"tracking": 0.0,"dropout": 0.012,"ghost": 0.0,"ghostDist": 0.01,"interlace": 0.9,"persist": 0.1,"sat": 1.02,"hue": 0.0,"black": 0.05,"whiteClip": 0.98,"snow": 0.0,"curve": 0.035,"scanline": 0.4,"mask": 0.16,"crtBloom": 0.35,"crtVignette": 0.3,"glare": 0.1,"overscan": 0.03,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.15,"corner": 0.02,"osd": "OsdStyle.CAMCORDER","osdColor": "0xFFDDF4FF.toInt()","tapeSpeed": "SP","audio": "AudioProfile.HIFI_AFM","id": "video8","name": "Video8","year": "1987","format": "Video8 · 8mm metal tape","blurb": "Metal particle tape in a Handycam. Cleaner, cooler, and the first one that sounded good."},{"exposure": 1.02,"gamma": 1.0,"contrast": 1.05,"saturation": 1.0,"tintR": 1.0,"tintG": 1.0,"tintB": 1.0,"softness": 0.2,"ccdSmear": 0.45,"tubeLag": 0.0,"lensBloom": 0.18,"lensVignette": 0.14,"lumaBw": 1.5,"chromaBw": 15.0,"chromaDelay": 1.6,"sharpen": 0.68,"dotCrawl": 0.0,"rainbow": 0.0,"noise": 0.024,"noiseDark": 0.9,"chromaNoise": 0.008,"jitter": 0.35,"warp": 0.5,"headSwitch": 0.45,"tracking": 0.0,"dropout": 0.008,"ghost": 0.0,"ghostDist": 0.01,"interlace": 0.9,"persist": 0.06,"sat": 1.0,"hue": 0.0,"black": 0.04,"whiteClip": 0.99,"snow": 0.0,"curve": 0.025,"scanline": 0.34,"mask": 0.12,"crtBloom": 0.25,"crtVignette": 0.22,"glare": 0.1,"overscan": 0.03,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.1,"corner": 0.02,"osd": "OsdStyle.CAMCORDER","osdColor": "0xFFE8FFF0.toInt()","tapeSpeed": "SP","audio": "AudioProfile.HIFI_AFM","id": "hi8","name": "Hi8","year": "1989","format": "Hi8 · S-video out","blurb": "End of the decade prosumer. 400 lines, S-video, so no dot crawl at all."},{"exposure": 1.02,"gamma": 1.0,"contrast": 1.05,"saturation": 1.0,"tintR": 1.0,"tintG": 1.0,"tintB": 1.0,"softness": 0.22,"ccdSmear": 0.0,"tubeLag": 0.0,"lensBloom": 0.22,"lensVignette": 0.18,"lumaBw": 1.4,"chromaBw": 18.0,"chromaDelay": 1.8,"sharpen": 0.85,"dotCrawl": 0.0,"rainbow": 0.0,"noise": 0.03,"noiseDark": 1.2,"chromaNoise": 0.011,"jitter": 0.5,"warp": 0.7,"headSwitch": 0.6,"tracking": 0.0,"dropout": 0.02,"ghost": 0.0,"ghostDist": 0.01,"interlace": 0.9,"persist": 0.1,"sat": 1.0,"hue": 0.0,"black": 0.05,"whiteClip": 0.98,"snow": 0.0,"curve": 0.03,"scanline": 0.4,"mask": 0.15,"crtBloom": 0.35,"crtVignette": 0.3,"glare": 0.1,"overscan": 0.03,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.15,"corner": 0.02,"osd": "OsdStyle.PLAYER","osdColor": "0xFFFFFFFF.toInt()","tapeSpeed": "S-SP","audio": "AudioProfile.HIFI_AFM","id": "svhs","name": "S-VHS","year": "1988","format": "S-VHS · separated Y/C","blurb": "Super VHS with the luma kept apart from the chroma. Sharp, ringy, still tape."},{"exposure": 1.0,"gamma": 1.0,"contrast": 1.06,"saturation": 0.9,"tintR": 0.97,"tintG": 1.0,"tintB": 1.05,"softness": 0.52,"ccdSmear": 0.0,"tubeLag": 0.55,"lensBloom": 0.48,"lensVignette": 0.32,"lumaBw": 2.7,"chromaBw": 24.0,"chromaDelay": 3.0,"sharpen": 0.5,"dotCrawl": 0.45,"rainbow": 0.2,"noise": 0.062,"noiseDark": 1.5,"chromaNoise": 0.022,"jitter": 0.8,"warp": 1.4,"headSwitch": 0.5,"tracking": 0.0,"dropout": 0.02,"ghost": 0.0,"ghostDist": 0.01,"interlace": 0.9,"persist": 0.28,"sat": 1.0,"hue": 0.0,"black": 0.1,"whiteClip": 0.96,"snow": 0.0,"curve": 0.06,"scanline": 0.6,"mask": 0.26,"crtBloom": 0.5,"crtVignette": 0.42,"glare": 0.22,"overscan": 0.05,"bright": 1.06,"gammaOut": 1.0,"flicker": 0.22,"corner": 0.028,"osd": "OsdStyle.NEWS","osdColor": "0xFFFFFFFF.toInt()","tapeSpeed": "SP","audio": "AudioProfile.ENG_FIELD","id": "umatic","name": "U-matic","year": "1980","format": "U-matic · 3/4\" · tube camera","blurb": "Local news on a shoulder rig, shot on a pickup tube: highlights bloom and drag comet trails."},{"exposure": 1.02,"gamma": 1.0,"contrast": 1.05,"saturation": 1.0,"tintR": 1.0,"tintG": 1.0,"tintB": 1.0,"softness": 0.42,"ccdSmear": 0.0,"tubeLag": 0.0,"lensBloom": 0.22,"lensVignette": 0.18,"lumaBw": 5.0,"chromaBw": 40.0,"chromaDelay": 4.5,"sharpen": 0.5,"dotCrawl": 0.55,"rainbow": 0.35,"noise": 0.125,"noiseDark": 1.8,"chromaNoise": 0.055,"jitter": 3.1,"warp": 5.5,"headSwitch": 1.0,"tracking": 1.0,"dropout": 0.2,"ghost": 0.0,"ghostDist": 0.01,"interlace": 1.0,"persist": 0.1,"sat": 0.62,"hue": -0.08,"black": 0.16,"whiteClip": 0.95,"snow": 0.34,"curve": 0.035,"scanline": 0.5,"mask": 0.18,"crtBloom": 0.45,"crtVignette": 0.3,"glare": 0.16,"overscan": 0.03,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.35,"corner": 0.02,"osd": "OsdStyle.TRACKING","osdColor": "0xFFFFFFFF.toInt()","tapeSpeed": "EP","audio": "AudioProfile.WORN","id": "tracking","name": "Tracking","year": "1986","format": "VHS · misaligned heads","blurb": "Nobody adjusted the tracking dial. Noise bands crawl up the picture and colour drops out."},{"exposure": 1.02,"gamma": 1.0,"contrast": 0.98,"saturation": 0.9,"tintR": 1.0,"tintG": 1.0,"tintB": 1.0,"softness": 0.5,"ccdSmear": 0.0,"tubeLag": 0.0,"lensBloom": 0.22,"lensVignette": 0.18,"lumaBw": 7.0,"chromaBw": 52.0,"chromaDelay": 6.0,"sharpen": 0.95,"dotCrawl": 0.7,"rainbow": 0.45,"noise": 0.098,"noiseDark": 1.9,"chromaNoise": 0.05,"jitter": 1.7,"warp": 2.6,"headSwitch": 0.85,"tracking": 0.0,"dropout": 0.06,"ghost": 0.5,"ghostDist": 0.013,"interlace": 0.9,"persist": 0.16,"sat": 0.72,"hue": 0.06,"black": 0.2,"whiteClip": 0.93,"snow": 0.08,"curve": 0.035,"scanline": 0.48,"mask": 0.18,"crtBloom": 0.5,"crtVignette": 0.36,"glare": 0.14,"overscan": 0.03,"bright": 1.06,"gammaOut": 1.0,"flicker": 0.15,"corner": 0.02,"osd": "OsdStyle.DATE_ONLY","osdColor": "0xFFF0E8D8.toInt()","tapeSpeed": "LP","audio": "AudioProfile.LINEAR_EP","id": "third_gen","name": "3rd Gen","year": "1989","format": "VHS · copy of a copy of a copy","blurb": "Duplicated deck to deck over an RF lead. Ghosted, washed out, ringing on every edge."},{"exposure": 0.99,"gamma": 1.0,"contrast": 1.05,"saturation": 0.94,"tintR": 1.03,"tintG": 0.99,"tintB": 0.94,"softness": 0.44,"ccdSmear": 0.0,"tubeLag": 0.0,"lensBloom": 0.22,"lensVignette": 0.18,"lumaBw": 4.6,"chromaBw": 38.0,"chromaDelay": 4.2,"sharpen": 0.6,"dotCrawl": 0.6,"rainbow": 0.34,"noise": 0.085,"noiseDark": 1.7,"chromaNoise": 0.042,"jitter": 1.6,"warp": 3.0,"headSwitch": 1.0,"tracking": 0.22,"dropout": 0.16,"ghost": 0.0,"ghostDist": 0.01,"interlace": 0.9,"persist": 0.14,"sat": 0.74,"hue": 0.05,"black": 0.17,"whiteClip": 0.945,"snow": 0.12,"curve": 0.05,"scanline": 0.52,"mask": 0.22,"crtBloom": 0.48,"crtVignette": 0.4,"glare": 0.26,"overscan": 0.045,"bright": 1.03,"gammaOut": 1.0,"flicker": 0.28,"corner": 0.026,"osd": "OsdStyle.PLAYER","osdColor": "0xFFEFEFEF.toInt()","tapeSpeed": "SP","audio": "AudioProfile.WORN","id": "rental","name": "Rental","year": "1986","format": "VHS · ex-rental, 400 plays","blurb": "Be kind, rewind. Shed oxide, creased tape, and a lifetime of other people's VCRs."},{"exposure": 1.05,"gamma": 0.94,"contrast": 1.22,"saturation": 0.35,"tintR": 1.0,"tintG": 1.02,"tintB": 1.0,"softness": 0.5,"ccdSmear": 0.4,"tubeLag": 0.0,"lensBloom": 0.3,"lensVignette": 0.42,"lumaBw": 4.2,"chromaBw": 44.0,"chromaDelay": 3.0,"sharpen": 0.9,"dotCrawl": 0.35,"rainbow": 0.12,"noise": 0.095,"noiseDark": 2.0,"chromaNoise": 0.02,"jitter": 1.1,"warp": 1.5,"headSwitch": 0.9,"tracking": 0.0,"dropout": 0.07,"ghost": 0.0,"ghostDist": 0.01,"interlace": 1.0,"persist": 0.2,"sat": 0.45,"hue": 0.0,"black": 0.2,"whiteClip": 0.92,"snow": 0.06,"curve": 0.045,"scanline": 0.6,"mask": 0.2,"crtBloom": 0.3,"crtVignette": 0.45,"glare": 0.1,"overscan": 0.04,"bright": 1.05,"gammaOut": 1.0,"flicker": 0.25,"corner": 0.02,"osd": "OsdStyle.SECURITY","osdColor": "0xFFFFFFFF.toInt()","tapeSpeed": "24H","audio": "AudioProfile.WORN","id": "security","name": "Security","year": "1984","format": "Time-lapse VCR · 24 hr mode","blurb": "Lobby camera on a 24 hour time-lapse deck. Washed out, over-sharpened, always stamped."}];
+</script>
+<script>
+const SHADERS = {"VERTEX": "\nattribute vec4 aPosition;\nattribute vec2 aTexCoord;\nuniform mat4 uTexMatrix;\nvarying vec2 vTex;\nvarying vec2 vQuad;\nvoid main() {\n    gl_Position = aPosition;\n    vTex = (uTexMatrix * vec4(aTexCoord, 0.0, 1.0)).xy;\n    vQuad = aTexCoord;\n}\n", "FRAG_PICKUP": "\nprecision highp float;\n\nconst float PI = 3.14159265;\n\nfloat luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n\nvec3 rgb2yiq(vec3 c) {\n    return vec3(\n        dot(c, vec3(0.299, 0.587, 0.114)),\n        dot(c, vec3(0.5959, -0.2746, -0.3213)),\n        dot(c, vec3(0.2115, -0.5227, 0.3112)));\n}\n\nvec3 yiq2rgb(vec3 c) {\n    return vec3(\n        c.x + 0.956 * c.y + 0.619 * c.z,\n        c.x - 0.272 * c.y - 0.647 * c.z,\n        c.x - 1.106 * c.y + 1.703 * c.z);\n}\n\nfloat hash11(float p) {\n    p = fract(p * 0.1031);\n    p *= p + 33.33;\n    p *= p + p;\n    return fract(p);\n}\n\nfloat hash21(vec2 p) {\n    vec3 p3 = fract(vec3(p.xyx) * 0.1031);\n    p3 += dot(p3, p3.yzx + 33.33);\n    return fract((p3.x + p3.y) * p3.z);\n}\n\nfloat vnoise(float x) {\n    float i = floor(x);\n    float f = fract(x);\n    f = f * f * (3.0 - 2.0 * f);\n    return mix(hash11(i), hash11(i + 1.0), f);\n}\n\nuniform sampler2D sCam;\nuniform sampler2D sPrev;\nuniform sampler2D sOsd;\nuniform vec2 uDx;          // one output pixel, expressed in source texture space\nuniform vec2 uDy;\nuniform float uSoftness;   // cheap 80s zoom lens\nuniform float uSmear;      // CCD vertical smear on speculars\nuniform float uLag;        // vidicon/newvicon comet trails\nuniform float uBloom;      // halation inside the lens stack\nuniform float uExposure;\nuniform float uGamma;\nuniform float uContrast;\nuniform float uSaturation;\nuniform vec3 uTint;\nuniform float uVignette;\nuniform float uOsdAmount;\nuniform vec2 uFit;         // >1 on an axis means the source does not fill it\nvarying vec2 vTex;\nvarying vec2 vQuad;\n\nvoid main() {\n    // Anything the source does not reach is blanking level, not a smeared edge pixel:\n    // 16:9 material on a 4:3 raster gets real black bars, exactly like a letterboxed tape.\n    vec2 fitD = abs(vQuad - 0.5) * uFit;\n    if (fitD.x > 0.5 || fitD.y > 0.5) {\n        vec4 bar = texture2D(sOsd, vec2(vQuad.x, 1.0 - vQuad.y));\n        gl_FragColor = vec4(bar.rgb * bar.a * uOsdAmount, 1.0);\n        return;\n    }\n\n    vec3 c = texture2D(sCam, vTex).rgb;\n\n    if (uSoftness > 0.001) {\n        vec3 s = texture2D(sCam, vTex + uDx * 1.5).rgb\n               + texture2D(sCam, vTex - uDx * 1.5).rgb\n               + texture2D(sCam, vTex + uDy * 1.5).rgb\n               + texture2D(sCam, vTex - uDy * 1.5).rgb;\n        c = mix(c, s * 0.25, uSoftness);\n    }\n\n    c *= uExposure;\n\n    // Vertical smear: an interline transfer CCD leaking charge down the column when a\n    // specular highlight hits it. The 80s camcorder signature nobody could avoid.\n    if (uSmear > 0.001) {\n        float sm = 0.0;\n        for (int i = 1; i <= 10; i++) {\n            float d = float(i) * 3.0;\n            float a = luma(texture2D(sCam, vTex + uDy * d).rgb);\n            float b = luma(texture2D(sCam, vTex - uDy * d).rgb);\n            float fall = 1.0 - float(i) / 11.0;\n            sm += (max(a - 0.80, 0.0) + max(b - 0.80, 0.0)) * fall;\n        }\n        c += uSmear * sm * vec3(0.92, 0.96, 1.0);\n    }\n\n    // Halation around highlights inside the lens/prism block.\n    if (uBloom > 0.001) {\n        vec3 bl = vec3(0.0);\n        for (int i = 0; i < 8; i++) {\n            float a = float(i) * 0.7853981;\n            bl += texture2D(sCam, vTex + (uDx * cos(a) + uDy * sin(a)) * 3.5).rgb;\n        }\n        c += uBloom * max(bl * 0.125 - 0.55, 0.0) * 1.6;\n    }\n\n    c = pow(max(c, 0.0), vec3(uGamma));\n    c = (c - 0.5) * uContrast + 0.5;\n    float y = luma(c);\n    c = mix(vec3(y), c, uSaturation);\n    c *= uTint;\n\n    vec2 d = vQuad - 0.5;\n    c *= 1.0 - uVignette * dot(d, d) * 1.6;\n\n    // Pickup tube lag: bright areas keep glowing for a few frames -> comet trails.\n    if (uLag > 0.001) {\n        vec3 prev = texture2D(sPrev, vQuad).rgb;\n        c = max(c, prev * uLag);\n    }\n\n    // Character generator overlay, burned in ahead of the tape stage.\n    if (uOsdAmount > 0.001) {\n        vec4 osd = texture2D(sOsd, vec2(vQuad.x, 1.0 - vQuad.y));\n        c = mix(c, osd.rgb, osd.a * uOsdAmount);\n    }\n\n    gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);\n}\n", "FRAG_TAPE": "\nprecision highp float;\n\nconst float PI = 3.14159265;\n\nfloat luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n\nvec3 rgb2yiq(vec3 c) {\n    return vec3(\n        dot(c, vec3(0.299, 0.587, 0.114)),\n        dot(c, vec3(0.5959, -0.2746, -0.3213)),\n        dot(c, vec3(0.2115, -0.5227, 0.3112)));\n}\n\nvec3 yiq2rgb(vec3 c) {\n    return vec3(\n        c.x + 0.956 * c.y + 0.619 * c.z,\n        c.x - 0.272 * c.y - 0.647 * c.z,\n        c.x - 1.106 * c.y + 1.703 * c.z);\n}\n\nfloat hash11(float p) {\n    p = fract(p * 0.1031);\n    p *= p + 33.33;\n    p *= p + p;\n    return fract(p);\n}\n\nfloat hash21(vec2 p) {\n    vec3 p3 = fract(vec3(p.xyx) * 0.1031);\n    p3 += dot(p3, p3.yzx + 33.33);\n    return fract((p3.x + p3.y) * p3.z);\n}\n\nfloat vnoise(float x) {\n    float i = floor(x);\n    float f = fract(x);\n    f = f * f * (3.0 - 2.0 * f);\n    return mix(hash11(i), hash11(i + 1.0), f);\n}\n\nuniform sampler2D sSrc;\nuniform sampler2D sPrev;\nuniform vec2 uRes;\nuniform float uTime;\nuniform float uField;\nuniform float uSeed;\n\nuniform float uLumaBw;\nuniform float uChromaBw;\nuniform float uChromaDelay;\nuniform float uSharpen;\nuniform float uDotCrawl;\nuniform float uRainbow;\nuniform float uNoise;\nuniform float uNoiseDark;\nuniform float uChromaNoise;\nuniform float uJitter;\nuniform float uWarp;\nuniform float uHeadSwitch;\nuniform float uTracking;\nuniform float uDropout;\nuniform float uGhost;\nuniform float uGhostDist;\nuniform float uInterlace;\nuniform float uPersist;\nuniform float uSat;\nuniform float uHue;\nuniform float uBlack;\nuniform float uWhiteClip;\nuniform float uSnow;\n\nvarying vec2 vQuad;\n\nvoid main() {\n    vec2 uv = vQuad;\n    float px = 1.0 / uRes.x;\n    float ny = 1.0 - uv.y;                 // 0 at the top of the frame, like a scan\n    float line = floor(ny * uRes.y);\n    float t = uTime;\n    float fld = floor(t * 59.94);\n\n    // ---- time base error: no consumer deck had a TBC ----\n    float jit = (vnoise(line * 1.7 + fld * 3.1) - 0.5) * 2.0;\n    jit += (vnoise(line * 0.11 + t * 2.7) - 0.5) * 3.0;\n    float warp = sin(ny * 9.0 + t * 1.7) * 0.6 + sin(ny * 23.0 - t * 2.3) * 0.25;\n    float xoff = (jit * uJitter + warp * uWarp) * px;\n\n    // ---- head switching noise: the torn band at the bottom of every VHS field ----\n    float hs = smoothstep(0.970, 1.0, ny);\n    xoff += hs * (0.010 + 0.030 * (vnoise(t * 40.0 + line) - 0.5)) * uHeadSwitch;\n\n    // ---- mistracking band drifting up the picture ----\n    float band = 0.0;\n    if (uTracking > 0.001) {\n        float pos = fract(t * 0.07);\n        float d = abs(fract(ny - pos + 0.5) - 0.5);\n        band = smoothstep(0.055, 0.0, d) * uTracking;\n        xoff += band * (vnoise(line * 3.0 + t * 90.0) - 0.5) * 0.05;\n    }\n\n    uv.x = clamp(uv.x + xoff, 0.0, 1.0);\n\n    // ---- colour-under chroma: wide box filter + the delay line's sideways shift ----\n    float chStep = uChromaBw * px / 6.0;\n    vec2 chroma = vec2(0.0);\n    float ywide = 0.0;\n    float wsum = 0.0;\n    vec2 chL = vec2(0.0);\n    vec2 chR = vec2(0.0);\n    for (int i = -6; i <= 6; i++) {\n        float fi = float(i);\n        float sx = clamp(uv.x + fi * chStep - uChromaDelay * px, 0.0, 1.0);\n        vec3 q = rgb2yiq(texture2D(sSrc, vec2(sx, uv.y)).rgb);\n        float w = 1.0 - abs(fi) / 8.0;\n        chroma += q.yz * w;\n        ywide += q.x * w;\n        wsum += w;\n        if (i == -6) chL = q.yz;\n        if (i == 6) chR = q.yz;\n    }\n    chroma /= wsum;\n    ywide /= wsum;\n\n    // ---- luma channel ----\n    float lStep = uLumaBw * px / 3.0;\n    float ynarrow = 0.0;\n    float lw = 0.0;\n    for (int i = -3; i <= 3; i++) {\n        float fi = float(i);\n        float w = exp(-fi * fi * 0.28);\n        float sx = clamp(uv.x + fi * lStep, 0.0, 1.0);\n        ynarrow += luma(texture2D(sSrc, vec2(sx, uv.y)).rgb) * w;\n        lw += w;\n    }\n    ynarrow /= lw;\n\n    // Record pre-emphasis that the player never quite undoes: symmetric ringing plus a\n    // trailing overshoot, the bright fringe on the right hand side of every dark edge.\n    float y = ynarrow + uSharpen * (ynarrow - ywide);\n    float yl = luma(texture2D(sSrc, vec2(clamp(uv.x - 2.5 * px, 0.0, 1.0), uv.y)).rgb);\n    y += uSharpen * 0.5 * (ynarrow - yl);\n\n    // ---- composite crosstalk (skipped by the S-video presets) ----\n    float phase = uv.x * uRes.x * 1.847 + line * PI + uField * PI;\n    if (uDotCrawl > 0.001) {\n        float edge = length(chR - chL);\n        y += uDotCrawl * edge * 0.6 * cos(phase);\n    }\n    if (uRainbow > 0.001) {\n        float hf = ynarrow - ywide;\n        chroma += uRainbow * hf * vec2(cos(phase), sin(phase));\n    }\n\n    // ---- RF ghost / multipath, the giveaway of a dub made over an RF modulator ----\n    if (uGhost > 0.001) {\n        float gy = luma(texture2D(sSrc, vec2(clamp(uv.x - uGhostDist, 0.0, 1.0), uv.y)).rgb);\n        y = (y + uGhost * gy * 0.45) / (1.0 + uGhost * 0.45);\n    }\n\n    // ---- tape noise: luma grain rises in the shadows, chroma noise is coarse ----\n    float grain = hash21(vec2(uv.x * uRes.x, line) + vec2(uSeed * 37.0, uSeed * 17.0)) - 0.5;\n    y += grain * uNoise * (1.0 + uNoiseDark * (1.0 - y));\n    if (uChromaNoise > 0.001) {\n        float cb = floor(uv.x * uRes.x / 6.0);\n        chroma += vec2(\n            hash21(vec2(cb, line) + vec2(uSeed * 3.0, uSeed * 7.0)) - 0.5,\n            hash21(vec2(cb, line) + vec2(uSeed * 11.0, uSeed * 5.0)) - 0.5) * uChromaNoise;\n    }\n\n    // ---- dropouts: shed oxide, so the head reads nothing for part of a line ----\n    if (uDropout > 0.001) {\n        float dl = hash11(line * 3.7 + fld * 1.31);\n        if (dl > 1.0 - uDropout) {\n            float start = hash11(line * 9.1 + fld * 7.7);\n            float len = 0.015 + 0.10 * hash11(line * 2.3 + fld * 3.3);\n            if (uv.x > start && uv.x < start + len) {\n                float dark = step(0.75, hash11(line * 5.9 + fld * 2.1));\n                y = mix(y, mix(0.95, 0.03, dark), 0.9);\n                chroma *= 0.08;\n            }\n        }\n    }\n\n    // ---- mistracking destroys the FM carrier entirely ----\n    if (band > 0.001) {\n        float sn = hash21(vec2(uv.x * uRes.x * 0.5, line) + vec2(uSeed * 13.0, uSeed * 29.0));\n        y = mix(y, sn, band * 0.85);\n        chroma *= 1.0 - band * 0.9;\n    }\n\n    // ---- the head switch band itself ----\n    if (hs > 0.001 && uHeadSwitch > 0.001) {\n        float sn = hash21(vec2(uv.x * uRes.x, line) + vec2(uSeed * 5.0, uSeed * 3.0));\n        float k = hs * uHeadSwitch;\n        y = mix(y, sn * 0.55 + 0.15, k * 0.9);\n        chroma *= 1.0 - k;\n    }\n\n    // ---- RF snow ----\n    if (uSnow > 0.001) {\n        float s = hash21(vec2(floor(uv.x * uRes.x * 0.5), line) + vec2(uSeed * 23.0, uSeed * 41.0));\n        y = mix(y, 1.0, step(1.0 - uSnow * 0.09, s) * 0.75);\n    }\n\n    // ---- levels ----\n    float ca = cos(uHue);\n    float sa = sin(uHue);\n    chroma = vec2(chroma.x * ca - chroma.y * sa, chroma.x * sa + chroma.y * ca) * uSat;\n    y = y * (1.0 - uBlack) + uBlack * 0.07;\n    y = min(y, uWhiteClip);\n\n    vec3 rgb = clamp(yiq2rgb(vec3(y, chroma)), 0.0, 1.0);\n\n    // ---- 60i: each field only refreshes every other line, so motion combs ----\n    vec3 prev = texture2D(sPrev, vQuad).rgb;\n    float par = mod(line, 2.0);\n    float useCur = 1.0 - uInterlace * step(0.5, abs(par - uField));\n    rgb = mix(prev, rgb, useCur);\n    if (uPersist > 0.001) {\n        rgb = max(rgb, prev * uPersist);\n    }\n\n    gl_FragColor = vec4(rgb, 1.0);\n}\n", "FRAG_CRT": "\nprecision highp float;\n\nconst float PI = 3.14159265;\n\nfloat luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n\nvec3 rgb2yiq(vec3 c) {\n    return vec3(\n        dot(c, vec3(0.299, 0.587, 0.114)),\n        dot(c, vec3(0.5959, -0.2746, -0.3213)),\n        dot(c, vec3(0.2115, -0.5227, 0.3112)));\n}\n\nvec3 yiq2rgb(vec3 c) {\n    return vec3(\n        c.x + 0.956 * c.y + 0.619 * c.z,\n        c.x - 0.272 * c.y - 0.647 * c.z,\n        c.x - 1.106 * c.y + 1.703 * c.z);\n}\n\nfloat hash11(float p) {\n    p = fract(p * 0.1031);\n    p *= p + 33.33;\n    p *= p + p;\n    return fract(p);\n}\n\nfloat hash21(vec2 p) {\n    vec3 p3 = fract(vec3(p.xyx) * 0.1031);\n    p3 += dot(p3, p3.yzx + 33.33);\n    return fract((p3.x + p3.y) * p3.z);\n}\n\nfloat vnoise(float x) {\n    float i = floor(x);\n    float f = fract(x);\n    f = f * f * (3.0 - 2.0 * f);\n    return mix(hash11(i), hash11(i + 1.0), f);\n}\n\nuniform sampler2D sSrc;\nuniform vec2 uSrcRes;\nuniform float uTime;\nuniform float uCurve;\nuniform float uScanline;\nuniform float uMask;\nuniform float uBloom;\nuniform float uVignette;\nuniform float uGlare;\nuniform float uOverscan;\nuniform float uBright;\nuniform float uGammaOut;\nuniform float uFlicker;\nuniform float uCorner;\nuniform float uOversample;   // output height / 480\nvarying vec2 vQuad;\n\nvec2 curve(vec2 uv, float k) {\n    uv = uv * 2.0 - 1.0;\n    vec2 o = uv.yx * uv.yx;\n    uv += uv * o * k;\n    return uv * 0.5 + 0.5;\n}\n\nvoid main() {\n    // A TV cropped the outer few percent of the raster - which is exactly where the\n    // head switching mess lives, so overscan is what hid it.\n    vec2 uv = (vQuad - 0.5) * (1.0 - uOverscan) + 0.5;\n    uv = curve(uv, uCurve);\n\n    vec3 col = vec3(0.0);\n    if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {\n        col = texture2D(sSrc, uv).rgb;\n\n        if (uBloom > 0.001) {\n            vec3 b = vec3(0.0);\n            for (int i = 0; i < 8; i++) {\n                float a = float(i) * 0.7853981;\n                b += texture2D(sSrc, uv + vec2(cos(a), sin(a)) * 0.0065).rgb;\n            }\n            col += max(b * 0.125 - 0.45, 0.0) * uBloom * 1.5;\n        }\n\n        // The line structure and the phosphor mask only exist if the output has the\n        // resolution to draw them. Rendering 480 scanlines into a 480 pixel tall frame\n        // does not look like a CRT, it just aliases into moire rings.\n        float fine = clamp((uOversample - 1.15) / 0.85, 0.0, 1.0);\n\n        if (uScanline * fine > 0.001) {\n            float sl = abs(sin(uv.y * uSrcRes.y * PI));\n            col *= mix(1.0, 0.30 + 0.70 * pow(sl, 0.75), uScanline * fine);\n        }\n\n        if (uMask * fine > 0.001) {\n            float m = mod(gl_FragCoord.x, 3.0);\n            vec3 mk = vec3(0.86);\n            if (m < 1.0) mk.r = 1.18;\n            else if (m < 2.0) mk.g = 1.18;\n            else mk.b = 1.18;\n            col *= mix(vec3(1.0), mk, uMask * fine);\n        }\n    }\n\n    // Softly rounded bezel corners.\n    if (uCorner > 0.0001) {\n        vec2 q = abs(vQuad - 0.5) - (0.5 - uCorner);\n        float d = length(max(q, 0.0)) - uCorner;\n        col *= 1.0 - smoothstep(-0.004, 0.004, d);\n    }\n\n    vec2 dv = vQuad - 0.5;\n    col *= 1.0 - uVignette * dot(dv, dv) * 2.2;\n    if (uGlare > 0.001) {\n        float g = max(0.0, 1.0 - length((vQuad - vec2(0.30, 0.76)) * vec2(1.5, 1.0)));\n        col += uGlare * pow(g, 3.0) * 0.14;\n    }\n    if (uFlicker > 0.001) {\n        col *= 1.0 + uFlicker * (hash11(floor(uTime * 59.94)) - 0.5) * 0.12;\n    }\n\n    col = pow(max(col, 0.0), vec3(uGammaOut)) * uBright;\n    gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);\n}\n"};
+</script>
+<script>
+/* ============================================================================
+   Tape Bench - a layer editor for VHS-88 tape formats.
+   The three shader stages are lifted verbatim from the app, so the monitor
+   here shows exactly what the camera will record.
+   ========================================================================== */
+
+const STAGES = [
+  ['pickup', 'Lens and pickup'],
+  ['tape', 'Composite and tape'],
+  ['display', 'Television'],
+];
+
+/* Each layer is a group of uniforms that model one physical effect.
+   `on` is what it becomes when added, `off` is the neutral value used when
+   it is removed - which is what gets exported. */
+const LAYERS = [
+  { id: 'lens', stage: 'pickup', name: 'Lens', note: 'Cheap 80s zoom: soft, glowing highlights, dark corners.', params: [
+    { k: 'softness', label: 'Softness', min: 0, max: 1, step: 0.01, on: 0.35, off: 0 },
+    { k: 'lensBloom', label: 'Halation', min: 0, max: 1, step: 0.01, on: 0.22, off: 0 },
+    { k: 'lensVignette', label: 'Vignette', min: 0, max: 0.8, step: 0.01, on: 0.18, off: 0 },
+  ]},
+  { id: 'ccd', stage: 'pickup', name: 'CCD smear', note: 'Charge leaking down the column under a highlight. The camcorder signature.', params: [
+    { k: 'ccdSmear', label: 'Smear', min: 0, max: 1.5, step: 0.01, on: 0.7, off: 0 },
+  ]},
+  { id: 'tube', stage: 'pickup', name: 'Tube lag', note: 'Pickup tubes kept glowing: bright areas drag comet trails.', params: [
+    { k: 'tubeLag', label: 'Lag', min: 0, max: 0.9, step: 0.01, on: 0.5, off: 0 },
+  ]},
+  { id: 'grade', stage: 'pickup', name: 'Exposure and colour', note: 'The machine’s own colorimetry.', params: [
+    { k: 'exposure', label: 'Exposure', min: 0.6, max: 1.6, step: 0.01, on: 1.02, off: 1 },
+    { k: 'gamma', label: 'Gamma', min: 0.7, max: 1.4, step: 0.01, on: 1, off: 1 },
+    { k: 'contrast', label: 'Contrast', min: 0.6, max: 1.6, step: 0.01, on: 1.05, off: 1 },
+    { k: 'saturation', label: 'Saturation', min: 0, max: 1.6, step: 0.01, on: 1, off: 1 },
+    { k: 'tintR', label: 'Tint red', min: 0.8, max: 1.2, step: 0.005, on: 1, off: 1 },
+    { k: 'tintG', label: 'Tint green', min: 0.8, max: 1.2, step: 0.005, on: 1, off: 1 },
+    { k: 'tintB', label: 'Tint blue', min: 0.8, max: 1.2, step: 0.005, on: 1, off: 1 },
+  ]},
+
+  { id: 'bandwidth', stage: 'tape', name: 'Y/C bandwidth', note: 'Luma got ~3 MHz, colour-under chroma ~400 kHz. This is why colour bleeds sideways.', params: [
+    { k: 'lumaBw', label: 'Luma blur (px)', min: 0.5, max: 10, step: 0.1, on: 3, off: 0.5 },
+    { k: 'chromaBw', label: 'Chroma blur (px)', min: 1, max: 60, step: 0.5, on: 26, off: 1 },
+    { k: 'chromaDelay', label: 'Chroma delay (px)', min: 0, max: 10, step: 0.1, on: 3, off: 0 },
+  ]},
+  { id: 'ringing', stage: 'tape', name: 'Edge ringing', note: 'Record pre-emphasis the player never undid: bright fringe after every edge.', params: [
+    { k: 'sharpen', label: 'Overshoot', min: 0, max: 1.5, step: 0.01, on: 0.55, off: 0 },
+  ]},
+  { id: 'crosstalk', stage: 'tape', name: 'Composite crosstalk', note: 'Dot crawl and rainbows. S-video formats have none of this.', params: [
+    { k: 'dotCrawl', label: 'Dot crawl', min: 0, max: 1, step: 0.01, on: 0.5, off: 0 },
+    { k: 'rainbow', label: 'Cross-colour', min: 0, max: 1, step: 0.01, on: 0.25, off: 0 },
+  ]},
+  { id: 'noise', stage: 'tape', name: 'Tape noise', note: 'Grain rises in the shadows; chroma noise is coarse and blocky.', params: [
+    { k: 'noise', label: 'Luma grain', min: 0, max: 0.25, step: 0.001, on: 0.045, off: 0 },
+    { k: 'noiseDark', label: 'Grain in shadows', min: 0, max: 3, step: 0.05, on: 1.2, off: 0 },
+    { k: 'chromaNoise', label: 'Chroma noise', min: 0, max: 0.1, step: 0.001, on: 0.02, off: 0 },
+  ]},
+  { id: 'tbe', stage: 'tape', name: 'Time base error', note: 'No consumer deck had a time base corrector, so lines wander.', params: [
+    { k: 'jitter', label: 'Line jitter (px)', min: 0, max: 6, step: 0.05, on: 0.9, off: 0 },
+    { k: 'warp', label: 'Slow warp (px)', min: 0, max: 8, step: 0.05, on: 1.2, off: 0 },
+  ]},
+  { id: 'headswitch', stage: 'tape', name: 'Head switching', note: 'The torn band at the bottom of every field.', params: [
+    { k: 'headSwitch', label: 'Tear', min: 0, max: 1, step: 0.01, on: 0.85, off: 0 },
+  ]},
+  { id: 'tracking', stage: 'tape', name: 'Tracking band', note: 'Mistracking: a noise band drifting up the picture.', params: [
+    { k: 'tracking', label: 'Severity', min: 0, max: 1, step: 0.01, on: 0.6, off: 0 },
+  ]},
+  { id: 'dropout', stage: 'tape', name: 'Dropouts', note: 'Shed oxide: the head reads nothing for part of a line.', params: [
+    { k: 'dropout', label: 'Rate', min: 0, max: 0.3, step: 0.005, on: 0.05, off: 0 },
+  ]},
+  { id: 'ghost', stage: 'tape', name: 'RF ghost', note: 'Multipath echo - the giveaway of a dub made over an aerial lead.', params: [
+    { k: 'ghost', label: 'Echo', min: 0, max: 1, step: 0.01, on: 0.45, off: 0 },
+    { k: 'ghostDist', label: 'Echo delay', min: 0, max: 0.05, step: 0.001, on: 0.012, off: 0.01 },
+  ]},
+  { id: 'interlace', stage: 'tape', name: 'Interlace', note: '60i: each field refreshes alternate lines, so motion combs.', params: [
+    { k: 'interlace', label: 'Field split', min: 0, max: 1, step: 0.01, on: 0.9, off: 0 },
+  ]},
+  { id: 'persist', stage: 'tape', name: 'Persistence', note: 'Bright areas decay over several frames.', params: [
+    { k: 'persist', label: 'Trail', min: 0, max: 0.7, step: 0.01, on: 0.2, off: 0 },
+  ]},
+  { id: 'levels', stage: 'tape', name: 'Tape levels', note: 'Faded colour, shifted hue, lifted blacks, clipped whites.', params: [
+    { k: 'sat', label: 'Saturation', min: 0, max: 1.5, step: 0.01, on: 1, off: 1 },
+    { k: 'hue', label: 'Hue shift', min: -0.4, max: 0.4, step: 0.005, on: 0, off: 0 },
+    { k: 'black', label: 'Black lift', min: 0, max: 0.4, step: 0.005, on: 0.06, off: 0 },
+    { k: 'whiteClip', label: 'White clip', min: 0.8, max: 1, step: 0.005, on: 0.98, off: 1 },
+  ]},
+  { id: 'snow', stage: 'tape', name: 'RF snow', note: 'Specks of pure noise off a weak signal.', params: [
+    { k: 'snow', label: 'Snow', min: 0, max: 1, step: 0.01, on: 0.3, off: 0 },
+  ]},
+
+  { id: 'geometry', stage: 'display', name: 'CRT geometry', note: 'Barrel curve, overscan (which is what hid the head-switch band), rounded corners.', params: [
+    { k: 'curve', label: 'Barrel', min: 0, max: 0.15, step: 0.001, on: 0.035, off: 0 },
+    { k: 'overscan', label: 'Overscan', min: 0, max: 0.12, step: 0.001, on: 0.03, off: 0 },
+    { k: 'corner', label: 'Corner radius', min: 0, max: 0.06, step: 0.001, on: 0.02, off: 0 },
+  ]},
+  { id: 'scanlines', stage: 'display', name: 'Scanlines', note: 'Only drawn when the output has the resolution to resolve them.', params: [
+    { k: 'scanline', label: 'Depth', min: 0, max: 1, step: 0.01, on: 0.45, off: 0 },
+  ]},
+  { id: 'mask', stage: 'display', name: 'Shadow mask', note: 'Phosphor triads, in screen pixels.', params: [
+    { k: 'mask', label: 'Strength', min: 0, max: 0.6, step: 0.01, on: 0.18, off: 0 },
+  ]},
+  { id: 'halation', stage: 'display', name: 'Halation', note: 'Glow blooming off the phosphor.', params: [
+    { k: 'crtBloom', label: 'Bloom', min: 0, max: 1, step: 0.01, on: 0.35, off: 0 },
+  ]},
+  { id: 'vignette', stage: 'display', name: 'Vignette and glare', note: 'Dark corners and a reflection off the glass.', params: [
+    { k: 'crtVignette', label: 'Vignette', min: 0, max: 0.8, step: 0.01, on: 0.3, off: 0 },
+    { k: 'glare', label: 'Glare', min: 0, max: 0.6, step: 0.01, on: 0.1, off: 0 },
+  ]},
+  { id: 'picture', stage: 'display', name: 'Picture', note: 'Brightness, gamma and mains flicker.', params: [
+    { k: 'bright', label: 'Brightness', min: 0.7, max: 1.4, step: 0.01, on: 1.03, off: 1 },
+    { k: 'gammaOut', label: 'Gamma', min: 0.7, max: 1.3, step: 0.01, on: 1, off: 1 },
+    { k: 'flicker', label: 'Flicker', min: 0, max: 0.6, step: 0.01, on: 0.15, off: 0 },
+  ]},
+];
+
+const ALL_PARAMS = [];
+LAYERS.forEach(l => l.params.forEach(p => ALL_PARAMS.push(p)));
+const PARAM_OF = {};
+LAYERS.forEach(l => l.params.forEach(p => (PARAM_OF[p.k] = { layer: l, spec: p })));
+
+/* ---------------------------------------------------------------- state */
+const params = {};
+ALL_PARAMS.forEach(p => (params[p.k] = p.off));
+let active = new Set();
+let selected = null;
+const meta = {
+  name: 'My Tape', year: '1986', speed: 'SP',
+  format: 'VHS · Standard Play', blurb: 'A tape of my own.',
+  osd: 'CAMCORDER', audio: 'LINEAR_SP', osdColor: '0xFFFFFFFF',
+};
+
+function isOff(spec) { return Math.abs(params[spec.k] - spec.off) < 1e-6; }
+function layerIsActive(layer) { return layer.params.some(p => !isOff(p)); }
+
+function loadPreset(p) {
+  ALL_PARAMS.forEach(s => { if (p[s.k] !== undefined) params[s.k] = p[s.k]; });
+  active = new Set(LAYERS.filter(layerIsActive).map(l => l.id));
+  if (!active.has(selected)) selected = [...active][0] || null;
+  syncMetaFrom(p);
+  renderAll();
+}
+
+function syncMetaFrom(p) {
+  if (!p.name) return;
+  meta.name = p.name; meta.year = p.year; meta.format = p.format;
+  meta.blurb = p.blurb; meta.speed = p.tapeSpeed;
+  meta.osd = String(p.osd).replace('OsdStyle.', '');
+  meta.audio = String(p.audio).replace('AudioProfile.', '');
+  meta.osdColor = typeof p.osdColor === 'string'
+    ? p.osdColor.replace('.toInt()', '') : '0xFFFFFFFF';
+  document.getElementById('m-name').value = meta.name;
+  document.getElementById('m-year').value = meta.year;
+  document.getElementById('m-speed').value = meta.speed;
+  document.getElementById('m-format').value = meta.format;
+  document.getElementById('m-blurb').value = meta.blurb;
+  document.getElementById('m-osd').value = meta.osd;
+  document.getElementById('m-audio').value = meta.audio;
+}
+
+/* ---------------------------------------------------------------- chain UI */
+const stackEl = document.getElementById('stack');
+const paletteEl = document.getElementById('palette');
+
+function renderChain() {
+  stackEl.innerHTML = '';
+  STAGES.forEach(([stage, label]) => {
+    const inStage = LAYERS.filter(l => l.stage === stage && active.has(l.id));
+    if (!inStage.length) return;
+    const h = document.createElement('div');
+    h.className = 'stage-label';
+    h.textContent = label;
+    stackEl.appendChild(h);
+    inStage.forEach(l => {
+      const row = document.createElement('div');
+      row.className = 'layer';
+      row.setAttribute('role', 'button');
+      row.tabIndex = 0;
+      row.setAttribute('aria-selected', String(selected === l.id));
+      row.innerHTML = '<span class="dot"></span><span class="nm"></span>';
+      row.querySelector('.nm').textContent = l.name;
+      const rm = document.createElement('button');
+      rm.className = 'rm';
+      rm.textContent = '×';
+      rm.title = 'Remove ' + l.name;
+      rm.setAttribute('aria-label', 'Remove ' + l.name);
+      rm.onclick = e => { e.stopPropagation(); removeLayer(l); };
+      row.appendChild(rm);
+      const pick = () => { selected = l.id; renderChain(); renderParams(); };
+      row.onclick = pick;
+      row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
+      stackEl.appendChild(row);
+    });
+  });
+  if (!active.size) {
+    stackEl.innerHTML = '<p class="empty">Blank tape. Add a layer below to start distorting.</p>';
+  }
+
+  paletteEl.innerHTML = '';
+  const spare = LAYERS.filter(l => !active.has(l.id));
+  if (!spare.length) {
+    paletteEl.innerHTML = '<span class="empty">Every layer is in the chain.</span>';
+  }
+  spare.forEach(l => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = '+ ' + l.name;
+    b.title = l.note;
+    b.onclick = () => addLayer(l);
+    paletteEl.appendChild(b);
+  });
+
+  document.getElementById('layer-count').textContent =
+    active.size + ' of ' + LAYERS.length + ' layers';
+}
+
+function addLayer(l) {
+  l.params.forEach(p => (params[p.k] = p.on));
+  active.add(l.id);
+  selected = l.id;
+  renderAll();
+}
+
+function removeLayer(l) {
+  l.params.forEach(p => (params[p.k] = p.off));
+  active.delete(l.id);
+  if (selected === l.id) selected = [...active][0] || null;
+  renderAll();
+}
+
+/* ---------------------------------------------------------------- params UI */
+const paramsEl = document.getElementById('params');
+
+function renderParams() {
+  paramsEl.innerHTML = '';
+  const layer = LAYERS.find(l => l.id === selected);
+  document.getElementById('param-layer').textContent = layer ? layer.name : '';
+  if (!layer) {
+    paramsEl.innerHTML = '<p class="empty">Pick a layer in the signal chain to tune it.</p>';
+    return;
+  }
+  const note = document.createElement('p');
+  note.className = 'note';
+  note.style.margin = '0';
+  note.textContent = layer.note;
+  paramsEl.appendChild(note);
+
+  layer.params.forEach(spec => {
+    const wrap = document.createElement('div');
+    wrap.className = 'param';
+    const top = document.createElement('div');
+    top.className = 'top';
+    const nm = document.createElement('span');
+    nm.textContent = spec.label;
+    const val = document.createElement('span');
+    val.className = 'val';
+    const fmt = v => (spec.step >= 0.1 ? v.toFixed(1) : spec.step >= 0.01 ? v.toFixed(2) : v.toFixed(3));
+    val.textContent = fmt(params[spec.k]);
+    top.append(nm, val);
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.min = spec.min; range.max = spec.max; range.step = spec.step;
+    range.value = params[spec.k];
+    range.setAttribute('aria-label', layer.name + ' ' + spec.label);
+    range.oninput = () => {
+      params[spec.k] = parseFloat(range.value);
+      val.textContent = fmt(params[spec.k]);
+      renderExport();
+    };
+    wrap.append(top, range);
+    paramsEl.appendChild(wrap);
+  });
+}
+
+/* ---------------------------------------------------------------- export */
+function kf(v) {
+  const r = Math.round(v * 10000) / 10000;
+  return (Number.isInteger(r) ? r.toFixed(1) : String(r)) + 'f';
+}
+function idFrom(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'my_tape';
+}
+function esc(s) { return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }
+
+const ORDER = [
+  'exposure', 'gamma', 'contrast', 'saturation', 'tintR', 'tintG', 'tintB',
+  'softness', 'ccdSmear', 'tubeLag', 'lensBloom', 'lensVignette',
+  'lumaBw', 'chromaBw', 'chromaDelay', 'sharpen', 'dotCrawl', 'rainbow',
+  'noise', 'noiseDark', 'chromaNoise', 'jitter', 'warp', 'headSwitch',
+  'tracking', 'dropout', 'ghost', 'ghostDist', 'interlace', 'persist',
+  'sat', 'hue', 'black', 'whiteClip', 'snow',
+  'curve', 'scanline', 'mask', 'crtBloom', 'crtVignette', 'glare',
+  'overscan', 'bright', 'gammaOut', 'flicker', 'corner',
+];
+
+function renderExport() {
+  const L = [];
+  L.push('VhsPreset(');
+  L.push('    id = "' + idFrom(meta.name) + '",');
+  L.push('    name = "' + esc(meta.name) + '",');
+  L.push('    year = "' + esc(meta.year) + '",');
+  L.push('    format = "' + esc(meta.format) + '",');
+  L.push('    blurb = "' + esc(meta.blurb) + '",');
+  ORDER.forEach(k => L.push('    ' + k + ' = ' + kf(params[k]) + ','));
+  L.push('    osd = OsdStyle.' + meta.osd + ',');
+  L.push('    osdColor = ' + meta.osdColor + '.toInt(),');
+  L.push('    tapeSpeed = "' + esc(meta.speed) + '",');
+  L.push('    audio = AudioProfile.' + meta.audio);
+  L.push('),');
+  document.getElementById('out').textContent = L.join('\n');
+}
+
+function renderAll() { renderChain(); renderParams(); renderExport(); }
+
+/* ---------------------------------------------------------------- meta wiring */
+[['m-name', 'name'], ['m-year', 'year'], ['m-speed', 'speed'],
+ ['m-format', 'format'], ['m-blurb', 'blurb'], ['m-osd', 'osd'],
+ ['m-audio', 'audio']].forEach(([id, key]) => {
+  document.getElementById(id).addEventListener('input', e => {
+    meta[key] = e.target.value;
+    renderExport();
+  });
+});
+
+const baseSel = document.getElementById('m-base');
+baseSel.innerHTML = '<option value="-1">Blank tape</option>' +
+  PRESETS.map((p, i) => '<option value="' + i + '">' + p.name + ' · ' + p.year + '</option>').join('');
+baseSel.value = '0';
+baseSel.onchange = () => {
+  const i = parseInt(baseSel.value, 10);
+  if (i < 0) {
+    ALL_PARAMS.forEach(p => (params[p.k] = p.off));
+    active = new Set(); selected = null; renderAll();
+  } else {
+    loadPreset(PRESETS[i]);
+  }
+};
+
+document.getElementById('copy').onclick = async e => {
+  const btn = e.currentTarget;
+  try {
+    await navigator.clipboard.writeText(document.getElementById('out').textContent);
+    btn.textContent = 'Copied';
+  } catch (err) {
+    const r = document.createRange();
+    r.selectNodeContents(document.getElementById('out'));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    btn.textContent = 'Selected — press Ctrl+C';
+  }
+  setTimeout(() => (btn.textContent = 'Copy Kotlin'), 1800);
+};
+
+/* ============================================================================
+   Source: an animated test pattern built to show every artefact at once.
+   ========================================================================== */
+const srcCanvas = document.createElement('canvas');
+srcCanvas.width = 640; srcCanvas.height = 480;
+const sctx = srcCanvas.getContext('2d');
+
+function drawTestPattern(t) {
+  const w = 640, h = 480;
+  sctx.fillStyle = '#101010';
+  sctx.fillRect(0, 0, w, h);
+
+  // colour bars: chroma bandwidth, bleed and delay all read here
+  const bars = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'];
+  bars.forEach((c, i) => {
+    sctx.fillStyle = c;
+    sctx.fillRect(i * w / 7, 0, w / 7 + 1, 150);
+  });
+
+  // fine vertical stripes: cross-colour rainbows appear over this
+  for (let x = 0; x < 150; x += 4) {
+    sctx.fillStyle = x % 8 === 0 ? '#f0f0f0' : '#101010';
+    sctx.fillRect(20 + x, 170, 4, 110);
+  }
+
+  // hard black/white edge: ringing and overshoot
+  sctx.fillStyle = '#f4f4f4';
+  sctx.fillRect(190, 170, 90, 110);
+  sctx.fillStyle = '#080808';
+  sctx.fillRect(280, 170, 60, 110);
+
+  // moving specular highlight: CCD smear, halation, tube lag
+  const cx = 420 + Math.sin(t * 0.7) * 70;
+  const g = sctx.createRadialGradient(cx, 225, 2, cx, 225, 40);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.35, '#ffffff');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  sctx.fillStyle = g;
+  sctx.fillRect(cx - 45, 180, 90, 90);
+
+  // greyscale ramp: grain in the shadows, black lift, white clip
+  for (let i = 0; i < 16; i++) {
+    const v = Math.round((i / 15) * 255);
+    sctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
+    sctx.fillRect(20 + i * 37, 300, 37, 60);
+  }
+
+  // skin tones: hue shift and saturation loss are most obvious on these
+  ['#e8b48c', '#c08a63', '#8a5a3c'].forEach((c, i) => {
+    sctx.fillStyle = c;
+    sctx.fillRect(20 + i * 80, 372, 76, 46);
+  });
+
+  // moving bar: interlace combing needs real motion
+  sctx.fillStyle = '#f0f0f0';
+  const bx = 280 + ((t * 150) % 340);
+  sctx.fillRect(bx, 372, 12, 46);
+
+  sctx.fillStyle = '#f0f0f0';
+  sctx.font = 'bold 26px ui-monospace, Menlo, monospace';
+  sctx.fillText('VHS-88 TEST PATTERN', 20, 452);
+  return srcCanvas;
+}
+
+/* on-screen display, drawn chunky like a real character generator */
+const osdCanvas = document.createElement('canvas');
+osdCanvas.width = 320; osdCanvas.height = 240;
+const octx = osdCanvas.getContext('2d');
+let osdOn = true;
+let osdStamp = -1;
+
+function drawOsd() {
+  const now = Math.floor(Date.now() / 1000);
+  if (now === osdStamp) return false;
+  osdStamp = now;
+  octx.clearRect(0, 0, 320, 240);
+  if (!osdOn || meta.osd === 'NONE') return true;
+  const d = new Date();
+  d.setFullYear(parseInt(meta.year, 10) || d.getFullYear());
+  const mon = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+  let hh = d.getHours() % 12; if (!hh) hh = 12;
+  const p2 = n => String(n).padStart(2, '0');
+  const time = hh + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()) + ' ' + (d.getHours() < 12 ? 'AM' : 'PM');
+  const date = mon + ' ' + d.getDate() + ' ' + d.getFullYear();
+  octx.font = 'bold 12.5px ui-monospace, Menlo, monospace';
+  octx.lineWidth = 2.4;
+  octx.strokeStyle = 'rgba(0,0,0,0.75)';
+  octx.fillStyle = '#fff';
+  const put = (s, x, y) => { octx.strokeText(s, x, y); octx.fillText(s, x, y); };
+  put('PAUSE', 24, 35);
+  const sp = octx.measureText(meta.speed).width;
+  put(meta.speed, 320 - 24 - sp, 35);
+  const tw = octx.measureText(time).width, dw = octx.measureText(date).width;
+  put(time, 320 - 24 - tw, 200);
+  put(date, 320 - 24 - dw, 216);
+  return true;
+}
+
+/* ============================================================================
+   WebGL: the app's own three stages, in order.
+   ========================================================================== */
+const canvas = document.getElementById('screen');
+const gl = canvas.getContext('webgl', { alpha: false, antialias: false, preserveDrawingBuffer: false });
+
+const WORK_W = 640, WORK_H = 480;
+let progPickup, progTape, progCrt, quad;
+let fboA = [], fboB = [], parity = 0, frames = 0;
+let srcTex, osdTex;
+let mode = 'bars', view = 'screen';
+let media = null, mediaKind = null;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    throw new Error(gl.getShaderInfoLog(s));
+  }
+  return s;
+}
+function program(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  p._u = {};
+  p.u = function (n) {
+    if (!(n in this._u)) this._u[n] = gl.getUniformLocation(this, n);
+    return this._u[n];
+  };
+  return p;
+}
+function target(w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fb, w, h };
+}
+function dataTex(filter) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+
+function initGL() {
+  progPickup = program(SHADERS.VERTEX, SHADERS.FRAG_PICKUP);
+  progTape = program(SHADERS.VERTEX, SHADERS.FRAG_TAPE);
+  progCrt = program(SHADERS.VERTEX, SHADERS.FRAG_CRT);
+  quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1, 0, 0, 1, -1, 1, 0, -1, 1, 0, 1, 1, 1, 1, 1,
+  ]), gl.STATIC_DRAW);
+  fboA = [target(WORK_W, WORK_H), target(WORK_W, WORK_H)];
+  fboB = [target(WORK_W, WORK_H), target(WORK_W, WORK_H)];
+  srcTex = dataTex(gl.LINEAR);
+  osdTex = dataTex(gl.NEAREST);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+}
+
+function bindQuad(p) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  const pos = gl.getAttribLocation(p, 'aPosition');
+  const tex = gl.getAttribLocation(p, 'aTexCoord');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 16, 0);
+  gl.enableVertexAttribArray(tex);
+  gl.vertexAttribPointer(tex, 2, gl.FLOAT, false, 16, 8);
+}
+function bindTex(p, name, unit, tex) {
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(p.u(name), unit);
+}
+
+/* crop the source to the 4:3 raster, exactly like the app does */
+function fitMatrix(sw, sh) {
+  const src = sw / sh, dst = 4 / 3;
+  let cx = 1, cy = 1;
+  if (src > dst) cx = dst / src; else cy = src / dst;   // fill
+  return {
+    m: new Float32Array([cx, 0, 0, 0, 0, cy, 0, 0, 0, 0, 1, 0,
+      0.5 * (1 - cx), 0.5 * (1 - cy), 0, 1]),
+    cx, cy,
+  };
+}
+
+let lastFrame = performance.now(), fpsAcc = 0, fpsN = 0;
+
+function render(now) {
+  requestAnimationFrame(render);
+  const t = now / 1000;
+
+  // ---- source ----
+  let sw = 640, sh = 480, ready = true;
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  if (mode === 'file' && media) {
+    if (mediaKind === 'video') {
+      if (media.readyState >= 2) {
+        sw = media.videoWidth; sh = media.videoHeight;
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, media);
+      } else ready = false;
+    } else {
+      sw = media.naturalWidth; sh = media.naturalHeight;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, media);
+    }
+  } else {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, drawTestPattern(t));
+  }
+  if (!ready) return;
+
+  if (drawOsd()) {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.bindTexture(gl.TEXTURE_2D, osdTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, osdCanvas);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  }
+
+  const cur = parity, prev = 1 - parity;
+  const fit = fitMatrix(sw, sh);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.DEPTH_TEST);
+
+  // ---- stage 1: lens and pickup ----
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fboA[cur].fb);
+  gl.viewport(0, 0, WORK_W, WORK_H);
+  gl.useProgram(progPickup);
+  bindQuad(progPickup);
+  gl.uniformMatrix4fv(progPickup.u('uTexMatrix'), false, fit.m);
+  bindTex(progPickup, 'sCam', 0, srcTex);
+  bindTex(progPickup, 'sPrev', 1, fboA[prev].tex);
+  bindTex(progPickup, 'sOsd', 2, osdTex);
+  gl.uniform2f(progPickup.u('uDx'), fit.cx / WORK_W, 0);
+  gl.uniform2f(progPickup.u('uDy'), 0, fit.cy / WORK_H);
+  gl.uniform2f(progPickup.u('uFit'), Math.abs(fit.cx), Math.abs(fit.cy));
+  ['softness', 'exposure', 'gamma', 'contrast', 'saturation'].forEach(k =>
+    gl.uniform1f(progPickup.u('u' + k[0].toUpperCase() + k.slice(1)), params[k]));
+  gl.uniform1f(progPickup.u('uSmear'), params.ccdSmear);
+  gl.uniform1f(progPickup.u('uLag'), params.tubeLag);
+  gl.uniform1f(progPickup.u('uBloom'), params.lensBloom);
+  gl.uniform1f(progPickup.u('uVignette'), params.lensVignette);
+  gl.uniform3f(progPickup.u('uTint'), params.tintR, params.tintG, params.tintB);
+  gl.uniform1f(progPickup.u('uOsdAmount'), osdOn && meta.osd !== 'NONE' ? 1 : 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  // ---- stage 2: composite and tape ----
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fboB[cur].fb);
+  gl.viewport(0, 0, WORK_W, WORK_H);
+  gl.useProgram(progTape);
+  bindQuad(progTape);
+  gl.uniformMatrix4fv(progTape.u('uTexMatrix'), false, IDENTITY);
+  bindTex(progTape, 'sSrc', 0, fboA[cur].tex);
+  bindTex(progTape, 'sPrev', 1, fboB[prev].tex);
+  gl.uniform2f(progTape.u('uRes'), WORK_W, WORK_H);
+  gl.uniform1f(progTape.u('uTime'), t % 1000);
+  gl.uniform1f(progTape.u('uField'), frames % 2);
+  gl.uniform1f(progTape.u('uSeed'), (frames * 0.6180339) % 1);
+  const tapeMap = {
+    uLumaBw: 'lumaBw', uChromaBw: 'chromaBw', uChromaDelay: 'chromaDelay',
+    uSharpen: 'sharpen', uDotCrawl: 'dotCrawl', uRainbow: 'rainbow',
+    uNoise: 'noise', uNoiseDark: 'noiseDark', uChromaNoise: 'chromaNoise',
+    uJitter: 'jitter', uWarp: 'warp', uHeadSwitch: 'headSwitch',
+    uTracking: 'tracking', uDropout: 'dropout', uGhost: 'ghost',
+    uGhostDist: 'ghostDist', uInterlace: 'interlace', uPersist: 'persist',
+    uSat: 'sat', uHue: 'hue', uBlack: 'black', uWhiteClip: 'whiteClip', uSnow: 'snow',
+  };
+  Object.keys(tapeMap).forEach(u => gl.uniform1f(progTape.u(u), params[tapeMap[u]]));
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  // ---- stage 3: the television ----
+  const outW = view === 'tape' ? 640 : 1280;
+  const outH = view === 'tape' ? 480 : 960;
+  if (canvas.width !== outW) { canvas.width = outW; canvas.height = outH; }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, outW, outH);
+  gl.useProgram(progCrt);
+  bindQuad(progCrt);
+  gl.uniformMatrix4fv(progCrt.u('uTexMatrix'), false, IDENTITY);
+  bindTex(progCrt, 'sSrc', 0, fboB[cur].tex);
+  gl.uniform2f(progCrt.u('uSrcRes'), WORK_W, WORK_H);
+  gl.uniform1f(progCrt.u('uTime'), t % 1000);
+  gl.uniform1f(progCrt.u('uOversample'), outH / WORK_H);
+  const crtMap = {
+    uCurve: 'curve', uScanline: 'scanline', uMask: 'mask', uBloom: 'crtBloom',
+    uVignette: 'crtVignette', uGlare: 'glare', uOverscan: 'overscan',
+    uBright: 'bright', uGammaOut: 'gammaOut', uFlicker: 'flicker', uCorner: 'corner',
+  };
+  Object.keys(crtMap).forEach(u => gl.uniform1f(progCrt.u(u), params[crtMap[u]]));
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  parity = 1 - parity;
+  frames++;
+
+  const dt = now - lastFrame; lastFrame = now;
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc > 700) {
+    document.getElementById('fps').textContent = Math.round(1000 / (fpsAcc / fpsN)) + ' fps';
+    fpsAcc = 0; fpsN = 0;
+  }
+}
+
+const IDENTITY = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+
+/* ---------------------------------------------------------------- controls */
+document.querySelectorAll('[data-src]').forEach(b => {
+  b.onclick = () => {
+    if (b.dataset.src === 'file' && !media) {
+      document.getElementById('file').click();
+      return;
+    }
+    mode = b.dataset.src;
+    document.querySelectorAll('[data-src]').forEach(o =>
+      o.setAttribute('aria-pressed', String(o === b)));
+  };
+});
+document.querySelectorAll('[data-view]').forEach(b => {
+  b.onclick = () => {
+    view = b.dataset.view;
+    document.querySelectorAll('[data-view]').forEach(o =>
+      o.setAttribute('aria-pressed', String(o === b)));
+  };
+});
+const osdBtn = document.querySelector('[data-osd]');
+osdBtn.onclick = () => {
+  osdOn = !osdOn;
+  osdBtn.setAttribute('aria-pressed', String(osdOn));
+  osdStamp = -1;
+};
+
+document.getElementById('file').onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  if (f.type.startsWith('video')) {
+    const v = document.createElement('video');
+    v.src = url; v.loop = true; v.muted = true; v.playsInline = true;
+    v.play();
+    media = v; mediaKind = 'video';
+  } else {
+    const img = new Image();
+    img.onload = () => { media = img; mediaKind = 'image'; };
+    img.src = url;
+    media = img; mediaKind = 'image';
+  }
+  mode = 'file';
+  document.querySelectorAll('[data-src]').forEach(o =>
+    o.setAttribute('aria-pressed', String(o.dataset.src === 'file')));
+  document.getElementById('srcinfo').textContent = f.name;
+};
+
+/* ---------------------------------------------------------------- boot */
+try {
+  if (!gl) throw new Error('WebGL is not available in this browser.');
+  initGL();
+  loadPreset(PRESETS[0]);
+  requestAnimationFrame(render);
+} catch (err) {
+  document.querySelector('.screen-wrap').innerHTML =
+    '<p class="note" style="padding:20px">Could not start the preview: ' + err.message + '</p>';
+  loadPreset(PRESETS[0]);
+}
+
+/* ============================================================================
+   Record out: the filtered picture, in real time, with the tape's audio path
+   applied to the clip's sound. Handed to the viewer through the downloads
+   capability - the sandbox never lets a page save a file by itself.
+   ========================================================================== */
+let recLen = 0, recRate = 2000000, recording = false;
+const recState = document.getElementById('rec-state');
+const recNote = document.getElementById('rec-note');
+const recBar = document.getElementById('rec-bar');
+const recFill = document.getElementById('rec-fill');
+const recGo = document.getElementById('rec-go');
+
+document.querySelectorAll('[data-len]').forEach(b => {
+  b.onclick = () => {
+    recLen = parseInt(b.dataset.len, 10);
+    document.querySelectorAll('[data-len]').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+  };
+});
+document.querySelectorAll('[data-rate]').forEach(b => {
+  b.onclick = () => {
+    recRate = parseInt(b.dataset.rate, 10);
+    document.querySelectorAll('[data-rate]').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+  };
+});
+
+function canSave() {
+  return typeof window !== 'undefined' && window.claude && window.claude.downloads;
+}
+function fileStem() {
+  return (idFrom(meta.name) || 'tape') + '-' + new Date().toISOString().slice(0, 19).replace(/[:T-]/g, '');
+}
+function mb(bytes) { return (bytes / 1048576).toFixed(1) + ' MB'; }
+
+async function offer(filename, blob) {
+  if (!canSave()) {
+    // Running as a plain file (e.g. the copy in the repo): a normal download
+    // link works here. Inside the artifact sandbox it would not, which is what
+    // the downloads capability above is for.
+    try {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      recState.textContent = 'saved';
+      recNote.textContent = 'Saved ' + filename + ' (' + mb(blob.size) + ').';
+    } catch (err) {
+      recNote.textContent = 'Rendered ' + mb(blob.size) +
+        ' but this view cannot hand the file over.';
+    }
+    return;
+  }
+  if (blob.size > 16 * 1048576) {
+    recNote.textContent = 'That came out ' + mb(blob.size) +
+      ', over the 16 MB limit. Shorten the length or drop the bitrate and try again.';
+    return;
+  }
+  try {
+    recState.textContent = 'waiting for you';
+    await window.claude.downloads.save({ filename, data: blob });
+    recState.textContent = 'saved';
+    recNote.textContent = 'Saved ' + filename + ' (' + mb(blob.size) + ').';
+  } catch (err) {
+    const code = (err && err.code) || 'unavailable';
+    recState.textContent = 'idle';
+    recNote.textContent =
+      code === 'declined' ? 'Save cancelled — the file is still here if you want to try again.' :
+      code === 'too_large' ? 'Too large to save (' + mb(blob.size) + '). Shorten it or drop the bitrate.' :
+      code === 'rate_limited' ? 'A save prompt is already open. Finish that one first.' :
+      'Could not save: ' + ((err && err.message) || code);
+  }
+}
+
+/* still frame */
+document.getElementById('grab').onclick = () => {
+  canvas.toBlob(b => {
+    if (b) offer(fileStem() + '.png', b);
+  }, 'image/png');
+};
+
+/* ---- the tape's audio path, mirroring VhsAudioProcessor ---- */
+const AUDIO_PROFILES = {
+  LINEAR_SP: { lo: 90, hi: 10000, hiss: 0.010, wow: [0.7, 0.0022], flutter: [6.3, 0.0010], drive: 1.5 },
+  LINEAR_EP: { lo: 120, hi: 6200, hiss: 0.026, wow: [0.6, 0.0050], flutter: [5.4, 0.0026], drive: 2.1 },
+  BETA_MONO: { lo: 80, hi: 11000, hiss: 0.008, wow: [0.8, 0.0018], flutter: [7.1, 0.0009], drive: 1.4 },
+  HIFI_AFM: { lo: 45, hi: 15000, hiss: 0.0025, wow: [0.4, 0.0006], flutter: [8.0, 0.0004], drive: 1.15 },
+  ENG_FIELD: { lo: 110, hi: 9000, hiss: 0.014, wow: [0.5, 0.0016], flutter: [6.0, 0.0008], drive: 1.7 },
+  WORN: { lo: 140, hi: 5200, hiss: 0.038, wow: [0.9, 0.0075], flutter: [4.6, 0.0040], drive: 2.4 },
+  CLEAN: { lo: 60, hi: 14000, hiss: 0.0015, wow: [0.3, 0.0004], flutter: [8.0, 0.0002], drive: 1.05 },
+};
+let audioCtx = null;
+
+function buildAudioChain(videoEl) {
+  const prof = AUDIO_PROFILES[meta.audio] || AUDIO_PROFILES.LINEAR_SP;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (!videoEl._srcNode) videoEl._srcNode = audioCtx.createMediaElementSource(videoEl);
+
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = prof.lo;
+  const lp1 = audioCtx.createBiquadFilter();
+  lp1.type = 'lowpass'; lp1.frequency.value = prof.hi;
+  const lp2 = audioCtx.createBiquadFilter();
+  lp2.type = 'lowpass'; lp2.frequency.value = prof.hi;
+
+  // soft saturation, the same tanh curve the app applies
+  const shaper = audioCtx.createWaveShaper();
+  const curve = new Float32Array(1024);
+  for (let i = 0; i < 1024; i++) {
+    const x = (i / 1023) * 2 - 1;
+    curve[i] = Math.tanh(x * prof.drive) / Math.tanh(prof.drive);
+  }
+  shaper.curve = curve;
+
+  // wow and flutter: a delay line modulated by two slow oscillators
+  const delay = audioCtx.createDelay(0.25);
+  delay.delayTime.value = 0.02;
+  [prof.wow, prof.flutter].forEach(([rate, depth]) => {
+    const osc = audioCtx.createOscillator();
+    const amt = audioCtx.createGain();
+    osc.frequency.value = rate;
+    amt.gain.value = depth / (2 * Math.PI * rate);   // depth is a pitch fraction
+    osc.connect(amt).connect(delay.delayTime);
+    osc.start();
+  });
+
+  // tape hiss, band limited by the same head response
+  const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() - 0.5) * 2;
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = noiseBuf; noise.loop = true;
+  const noiseGain = audioCtx.createGain();
+  noiseGain.gain.value = prof.hiss;
+  noise.start();
+
+  const merge = audioCtx.createGain();
+  videoEl._srcNode.connect(hp); hp.connect(lp1); lp1.connect(lp2);
+  lp2.connect(shaper); shaper.connect(delay); delay.connect(merge);
+  noise.connect(noiseGain); noiseGain.connect(lp1);
+
+  const dest = audioCtx.createMediaStreamDestination();
+  merge.connect(dest);
+  merge.connect(audioCtx.destination);          // so you hear the take as it records
+  return dest;
+}
+
+function pickMime() {
+  const wants = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9',
+    'video/webm',
+  ];
+  return wants.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+}
+
+recGo.onclick = async () => {
+  if (recording) return;
+  if (!window.MediaRecorder) {
+    recNote.textContent = 'This browser cannot record a canvas.';
+    return;
+  }
+  const isClip = mode === 'file' && media && mediaKind === 'video';
+  const limit = recLen || (isClip ? Math.min(media.duration || 30, 120) : 10);
+
+  recording = true;
+  recGo.disabled = true;
+  recState.textContent = 'recording';
+  recBar.style.display = 'block';
+  recFill.style.width = '0%';
+  recNote.textContent = isClip
+    ? 'Playing the clip through once — this runs in real time.'
+    : 'Recording the test pattern for ' + limit + ' seconds.';
+
+  const stream = canvas.captureStream(30);
+  let restoreLoop = null;
+  try {
+    if (isClip) {
+      const dest = buildAudioChain(media);
+      dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+      restoreLoop = media.loop;
+      media.loop = false;
+      media.muted = false;
+      media.currentTime = 0;
+      await media.play();
+    }
+  } catch (err) {
+    recNote.textContent = 'Could not start the clip’s audio: ' + err.message +
+      ' — recording the picture only.';
+  }
+
+  const chunks = [];
+  const rec = new MediaRecorder(stream, { mimeType: pickMime(), videoBitsPerSecond: recRate });
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+
+  const started = performance.now();
+  const tick = setInterval(() => {
+    const done = Math.min(1, (performance.now() - started) / 1000 / limit);
+    recFill.style.width = (done * 100).toFixed(1) + '%';
+    if (done >= 1) stop();
+  }, 100);
+
+  const stop = () => {
+    if (rec.state !== 'inactive') rec.stop();
+    clearInterval(tick);
+  };
+  if (isClip) media.onended = stop;
+
+  rec.onstop = async () => {
+    recording = false;
+    recGo.disabled = false;
+    recBar.style.display = 'none';
+    if (isClip) {
+      media.onended = null;
+      media.loop = restoreLoop === null ? true : restoreLoop;
+      media.muted = true;
+      media.play().catch(() => {});
+    }
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    recState.textContent = 'rendered ' + mb(blob.size);
+    await offer(fileStem() + '.webm', blob);
+  };
+
+  rec.start(250);
+};
+
+if (!canSave()) {
+  recNote.textContent =
+    'Records the filtered picture in real time, with the tape\u2019s audio path applied ' +
+    'to the clip\u2019s sound. Saves as WebM straight to your downloads folder.';
+}
+
+</script>

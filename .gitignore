@@ -1,0 +1,14 @@
+local.properties
+.gradle/
+build/
+app/build/
+.idea/
+*.iml
+.cxx/
+keystore.properties
+*.jks
+*.keystore
+
+# APKs ship as GitHub release assets, not in the tree
+*.apk
+*.aab
