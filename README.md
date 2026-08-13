@@ -7,6 +7,8 @@
 Twelve tape formats, each modelled as a signal path rather than a colour grade with
 noise dropped on top.
 
+**MIT licence** · Android 8.0+ · Kotlin + GLES 2.0
+
 ![The viewfinder](docs/viewfinder.png)
 
 </div>
@@ -223,3 +225,10 @@ the take, `MuxerWrapper` buffers and flushes.
 - Imported video is letterboxed into the 4:3 raster by default. Turn off
   **Setup → Letterbox imports** to crop-to-fill instead.
 - Front-camera capture is mirrored to match the viewfinder.
+
+---
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). Do what you like with it; a credit is welcome but not
+required.
