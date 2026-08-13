@@ -1,0 +1,90 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      # Android will not install an unsigned APK. Use the repository's own key when
+      # one is configured, otherwise mint a debug key so the release is still
+      # installable by hand - the same fallback app/build.gradle.kts uses locally.
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+            {
+              echo "storeFile=release.jks"
+              echo "storePassword=$KEYSTORE_PASSWORD"
+              echo "keyAlias=$KEY_ALIAS"
+              echo "keyPassword=$KEY_PASSWORD"
+            } > keystore.properties
+            echo "signed with the repository release key"
+          else
+            mkdir -p "$HOME/.android"
+            if [ ! -f "$HOME/.android/debug.keystore" ]; then
+              keytool -genkeypair -v \
+                -keystore "$HOME/.android/debug.keystore" \
+                -storepass android -keypass android \
+                -alias androiddebugkey \
+                -dname "CN=Android Debug,O=Android,C=US" \
+                -keyalg RSA -keysize 2048 -validity 10000
+            fi
+            echo "::warning::No KEYSTORE_BASE64 secret set - signing with a debug key. Installable by sideload, but not acceptable for Play."
+          fi
+
+      - name: Build
+        run: ./gradlew :app:exportApk --no-daemon --stacktrace
+
+      - name: Check the APK is signed
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs vhs-88.apk
+          ls -la vhs-88.apk
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" vhs-88.apk --clobber
+          else
+            gh release create "$TAG" vhs-88.apk \
+              --title "VHS-88 $TAG" \
+              --notes "Install \`vhs-88.apk\` on Android 8.0 or newer. See the [README](https://github.com/${GITHUB_REPOSITORY}#readme) for what is in it."
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vhs-88-apk
+          path: vhs-88.apk

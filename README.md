@@ -147,6 +147,9 @@ adb install -r vhs-88.apk
 
 Android 8.0 (API 26) and up. Needs `CAMERA`, and `RECORD_AUDIO` for sound.
 
+Release APKs are built by GitHub Actions straight from the tagged commit —
+see [`.github/workflows/release.yml`](.github/workflows/release.yml).
+
 ### Signing
 
 Android will not install an unsigned APK, so the release variant always gets a signing
