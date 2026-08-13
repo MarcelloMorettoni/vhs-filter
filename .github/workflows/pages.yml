@@ -1,0 +1,49 @@
+name: Publish Tape Bench
+
+# Tape Bench is one self-contained file, so GitHub Pages can serve it as-is.
+# Anyone can then use it from a link instead of being sent a copy that goes
+# stale the moment the tool changes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/tape-bench.html"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp tools/tape-bench.html _site/index.html
+          cp tools/tape-bench.html _site/tape-bench.html
+          ls -la _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
