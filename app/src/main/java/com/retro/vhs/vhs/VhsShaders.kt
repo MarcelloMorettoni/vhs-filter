@@ -152,7 +152,7 @@ void main() {
     c *= uTint;
 
     vec2 d = vQuad - 0.5;
-    c *= 1.0 - uVignette * dot(d, d) * 1.6;
+    c *= 1.0 - uVignette * dot(d, d) * 1.15;
 
     // Pickup tube lag: bright areas keep glowing for a few frames -> comet trails.
     if (uLag > 0.001) {
@@ -392,6 +392,10 @@ vec2 curve(vec2 uv, float k) {
     uv = uv * 2.0 - 1.0;
     vec2 o = uv.yx * uv.yx;
     uv += uv * o * k;
+    // A tube bulges the corners outward. Left alone that throws them off the
+    // raster and leaves the picture sitting inside a dark frame, so scale back
+    // by the same amount and let the glass bow the image instead of shrinking it.
+    uv /= (1.0 + k);
     return uv * 0.5 + 0.5;
 }
 
@@ -442,7 +446,7 @@ void main() {
     }
 
     vec2 dv = vQuad - 0.5;
-    col *= 1.0 - uVignette * dot(dv, dv) * 2.2;
+    col *= 1.0 - uVignette * dot(dv, dv) * 1.35;
     if (uGlare > 0.001) {
         float g = max(0.0, 1.0 - length((vQuad - vec2(0.30, 0.76)) * vec2(1.5, 1.0)));
         col += uGlare * pow(g, 3.0) * 0.14;
