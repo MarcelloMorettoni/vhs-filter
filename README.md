@@ -121,8 +121,9 @@ presets (Video8, Hi8, S-VHS) get a genuinely good-sounding profile instead, in s
 
 ![Tape Bench](docs/tape-bench.png)
 
-A browser tool for building your own format. Open **[`tools/tape-bench.html`](tools/tape-bench.html)**
-in any browser — it is one self-contained file, no build step and nothing to install.
+A browser tool for building your own format — and for putting video through the filter
+without an Android phone at all. Open **[`tools/tape-bench.html`](tools/tape-bench.html)**:
+one self-contained file, no build step, nothing to install, no server.
 
 - The preview runs **the app's own three shader stages**, extracted from
   `VhsShaders.kt` at build time, so the monitor cannot drift from what the camera records.
@@ -131,7 +132,29 @@ in any browser — it is one self-contained file, no build step and nothing to i
 - Judge it against a built-in test pattern designed to expose every artefact at once, or
   load your own image or clip.
 - **Export the Kotlin** and paste it into `VhsPreset.ALL`, or **export the filtered
-  video** as WebM with the tape's audio path applied to the sound.
+  video**.
+
+### Using it to convert video
+
+Load a clip, choose a tape, press **Export video**. You get an MP4 with the picture
+filtered and the sound dragged through that machine's audio path. The file is one HTML
+document, so you can hand it to someone and they need nothing else.
+
+**What it needs:** a recent Chrome or Edge for MP4 output. Firefox works but records
+WebM. Nothing is uploaded anywhere — the clip never leaves the machine it is opened on.
+
+**What to expect:**
+
+| | |
+|---|---|
+| Speed | Real time. A five minute clip takes five minutes. |
+| Keep the tab visible | A hidden tab throttles rendering and drops frames. The tool warns you if that happened. |
+| Shape | Everything lands on a 4:3 raster, because that is what these formats were. **Fill** crops to it, **Letterbox** keeps the whole frame and puts black either side. |
+| Size | Set by the bitrate buttons. Saving from the hosted page is capped at 16 MB; the local file has no limit. |
+| Audio | AAC is not available to browser recorders, so the sound is Opus in MP4. Players and ffmpeg are fine with it; if an editor objects, `ffmpeg -i in.mp4 -c:v copy -c:a aac out.mp4`. |
+
+For long clips the phone app is the better tool — it writes H.264 + AAC and decodes as
+fast as the device allows rather than in real time.
 
 ---
 

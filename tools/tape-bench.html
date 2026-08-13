@@ -337,6 +337,10 @@
         <button data-view="screen" aria-pressed="true">Viewfinder</button>
         <button data-view="tape" aria-pressed="false">Tape file 640×480</button>
       </div>
+      <div class="seg" role="group" aria-label="Framing">
+        <button data-fit="fill" aria-pressed="true">Fill 4:3</button>
+        <button data-fit="letterbox" aria-pressed="false">Letterbox</button>
+      </div>
       <div class="seg" role="group" aria-label="Overlay">
         <button data-osd="on" aria-pressed="true">Date stamp</button>
       </div>
@@ -978,10 +982,16 @@ function bindTex(p, name, unit, tex) {
 }
 
 /* crop the source to the 4:3 raster, exactly like the app does */
+let letterbox = false;
 function fitMatrix(sw, sh) {
   const src = sw / sh, dst = 4 / 3;
   let cx = 1, cy = 1;
-  if (src > dst) cx = dst / src; else cy = src / dst;   // fill
+  if (letterbox) {
+    // keep the whole frame and put black where the source does not reach
+    if (src > dst) cy = src / dst; else cx = dst / src;
+  } else {
+    if (src > dst) cx = dst / src; else cy = src / dst;
+  }
   return {
     m: new Float32Array([cx, 0, 0, 0, 0, cy, 0, 0, 0, 0, 1, 0,
       0.5 * (1 - cx), 0.5 * (1 - cy), 0, 1]),
@@ -1124,6 +1134,14 @@ document.querySelectorAll('[data-view]').forEach(b => {
       o.setAttribute('aria-pressed', String(o === b)));
   };
 });
+document.querySelectorAll('[data-fit]').forEach(b => {
+  b.onclick = () => {
+    letterbox = b.dataset.fit === 'letterbox';
+    document.querySelectorAll('[data-fit]').forEach(o =>
+      o.setAttribute('aria-pressed', String(o === b)));
+  };
+});
+
 const osdBtn = document.querySelector('[data-osd]');
 osdBtn.onclick = () => {
   osdOn = !osdOn;
@@ -1313,13 +1331,16 @@ function buildAudioChain(videoEl) {
 
 function pickMime() {
   const wants = [
+    'video/mp4;codecs=avc1,opus',
+    'video/mp4;codecs=avc1',
+    'video/mp4',
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
-    'video/webm;codecs=vp9',
     'video/webm',
   ];
   return wants.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
 }
+function extFor(mime) { return mime.indexOf('mp4') >= 0 ? '.mp4' : '.webm'; }
 
 recGo.onclick = async () => {
   if (recording) return;
@@ -1357,8 +1378,13 @@ recGo.onclick = async () => {
   }
 
   const chunks = [];
-  const rec = new MediaRecorder(stream, { mimeType: pickMime(), videoBitsPerSecond: recRate });
+  const mime = pickMime();
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: recRate });
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+
+  let hidden = false;
+  const watchTab = () => { if (document.hidden) hidden = true; };
+  document.addEventListener('visibilitychange', watchTab);
 
   const started = performance.now();
   const tick = setInterval(() => {
@@ -1383,9 +1409,14 @@ recGo.onclick = async () => {
       media.muted = true;
       media.play().catch(() => {});
     }
-    const blob = new Blob(chunks, { type: 'video/webm' });
+    document.removeEventListener('visibilitychange', watchTab);
+    const blob = new Blob(chunks, { type: mime || 'video/webm' });
     recState.textContent = 'rendered ' + mb(blob.size);
-    await offer(fileStem() + '.webm', blob);
+    await offer(fileStem() + extFor(mime), blob);
+    if (hidden) {
+      recNote.textContent = 'Heads up: the tab was hidden part way through, which ' +
+        'throttles rendering — those frames will be missing. Keep it visible and run it again.';
+    }
   };
 
   rec.start(250);
